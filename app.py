@@ -491,7 +491,7 @@ if "儀表板" in menu:
             "年耗電(kWh)": f"{r['_kwh']:,.0f}",
             "重大性評分":  r["_sc"],
             "管理者":       r.get("設備管理者", ""),
-        } for r in a_rows]), hide_index=True, use_container_width=True)
+        } for r in a_rows]))
 
     # ── 各項能源耗能占比
     st.divider()
@@ -526,15 +526,17 @@ if "儀表板" in menu:
             hovertemplate="<b>%{label}</b><br>占比：%{value:.2f}%<extra></extra>",
         ))
         fig_energy.update_layout(
-            title=dict(text="各項能源耗能占比", x=0.5, xanchor="center", y=0.97, yanchor="top", font=dict(size=16, color="#1a3a5c", family="Microsoft JhengHei")),
+            title=dict(text="各項能源耗能占比", x=0.5, xanchor="center",
+                       y=0.95, yanchor="top",
+                       font=dict(size=16, color="#1a3a5c")),
             legend=dict(
                 orientation="h",
-                yanchor="bottom", y=-0.15,
+                yanchor="bottom", y=-0.20,
                 xanchor="center", x=0.5,
                 font=dict(size=13)
             ),
-            margin=dict(t=50, b=60, l=20, r=20),
-            height=380,
+            margin=dict(t=60, b=80, l=20, r=20),
+            height=420,
         )
         st.plotly_chart(fig_energy, use_container_width=True)
 
@@ -1043,10 +1045,13 @@ elif "能源換算" in menu:
             hovertemplate="<b>%{label}</b><br>%{value:.4f} 公噸CO₂e<br>%{percent}<extra></extra>",
         ))
         fig_ghg.update_layout(
-            title=dict(text="溫室氣體排放來源分布", x=0.5, xanchor="center", y=0.97, yanchor="top", font=dict(size=16, color="#1a3a5c", family="Microsoft JhengHei")),
-            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-            margin=dict(t=50, b=80, l=20, r=20),
-            height=400,
+            title=dict(text="溫室氣體排放來源分布", x=0.5, xanchor="center",
+                       y=0.95, yanchor="top",
+                       font=dict(size=16, color="#1a3a5c")),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.25,
+                        xanchor="center", x=0.5, font=dict(size=12)),
+            margin=dict(t=60, b=100, l=20, r=20),
+            height=440,
         )
         st.plotly_chart(fig_ghg, use_container_width=True)
 
