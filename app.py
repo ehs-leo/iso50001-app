@@ -275,6 +275,7 @@ with st.sidebar:
         "全廠能耗儀表板",
         "設備盤查與照片管理",
         "評分標準說明",
+        "能源換算與排放數據",
         "每日負載分析",
         "從Excel重新載入",
     ], label_visibility="collapsed")
@@ -453,6 +454,74 @@ if "儀表板" in menu:
             "重大性評分":  r["_sc"],
             "管理者":       r.get("設備管理者", ""),
         } for r in a_rows]), hide_index=True, use_container_width=True)
+
+    # ── 各項能源耗能占比
+    st.divider()
+    st.subheader("🔥 各項能源耗能占比")
+
+    # 能源數據（來自 Excel 表2 各項能源耗能占比）
+    ENERGY_DATA = {
+        "汽油":   {"kwh_per_m2": 9339.49023,  "pct": 0.48},
+        "柴油":   {"kwh_per_m2": 20090.1181,  "pct": 1.04},
+        "外購電力": {"kwh_per_m2": 1911641,    "pct": 98.48},
+    }
+    TOTAL_ENERGY_KWH = 1941070.608  # 全廠實際耗能量 kWh/公秉
+
+    df_energy = pd.DataFrame([
+        {
+            "能源來源":           name,
+            "能耗評估(kWh/公秉)": v["kwh_per_m2"],
+            "耗能占比(%)":        v["pct"],
+        }
+        for name, v in ENERGY_DATA.items()
+    ])
+
+    e_col1, e_col2 = st.columns([1, 1])
+
+    with e_col1:
+        fig_energy = go.Figure(go.Pie(
+            labels=list(ENERGY_DATA.keys()),
+            values=[v["pct"] for v in ENERGY_DATA.values()],
+            hole=0.40,
+            marker_colors=["#3b82f6", "#ef4444", "#22c55e"],
+            textinfo="percent+label",
+            hovertemplate="<b>%{label}</b><br>占比：%{value:.2f}%<extra></extra>",
+        ))
+        fig_energy.update_layout(
+            title=dict(text="各項能源耗能占比", x=0.5, font=dict(size=15)),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom", y=-0.15,
+                xanchor="center", x=0.5,
+                font=dict(size=13)
+            ),
+            margin=dict(t=50, b=60, l=20, r=20),
+            height=380,
+        )
+        st.plotly_chart(fig_energy, use_container_width=True)
+
+    with e_col2:
+        st.markdown("##### 各項能源耗能數據")
+        st.markdown(f"""
+| 能源來源 | 能耗評估 (kWh/公秉) | 耗能占比 |
+|---------|-------------------|---------|
+| 汽油 | 9,339.49 | 0.48% |
+| 柴油 | 20,090.12 | 1.04% |
+| 外購電力 | 1,911,641 | 98.48% |
+""")
+        st.markdown(f"""
+        <div style='background:#f0fdf4;border-left:4px solid #22c55e;
+                    padding:14px 16px;border-radius:6px;margin-top:12px'>
+          <div style='font-size:12px;color:#64748b;margin-bottom:4px'>全廠實際總耗能量</div>
+          <div style='font-size:26px;font-weight:800;color:#166534'>
+            1,941,070.608 <span style='font-size:14px;font-weight:400'>kWh/公秉</span>
+          </div>
+          <div style='font-size:12px;color:#64748b;margin-top:8px'>
+            外購電力占全廠能源 <strong style='color:#166534'>98.48%</strong>，
+            為最主要能源來源
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 頁面二：設備盤查與照片管理
@@ -776,6 +845,179 @@ elif "評分標準" in menu:
         st.dataframe(df_pri, hide_index=True, use_container_width=True)
 
         st.info("**計算公式：** 優先改善評分 = 耗能估比分數 × 15% ＋ 老舊度分數 × 30% ＋ 運轉度分數 × 5% ＋ 改善頻率分數 × 20% ＋ 改善難易度分數 × 30%\n\n評分 ≥ 4.0 分 → 鑑別為 **I 級優先改善項目**，需優先執行能效改善作業。")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ── 頁面：能源換算與排放數據
+# ─────────────────────────────────────────────────────────────────────────────
+elif "能源換算" in menu:
+    st.subheader("⚡ 能源換算與溫室氣體排放數據")
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "熱值表", "換算表（能源使用）", "油當量表", "溫室氣體排放數據"
+    ])
+
+    # ── Tab 1：熱值表
+    with tab1:
+        st.markdown("#### 各能源熱值表")
+        st.caption("資料來源：113年能源統計手冊－能源產品單位熱值表")
+        df_heat = pd.DataFrame([
+            {"能源種類": "燃料油",        "熱值": 9320,  "單位": "kcal/L"},
+            {"能源種類": "車用汽油",       "熱值": 7520,  "單位": "kcal/L"},
+            {"能源種類": "柴油",          "熱值": 8629,  "單位": "kcal/L"},
+            {"能源種類": "液化石油氣(LPG)","熱值": 5958,  "單位": "kcal/L"},
+            {"能源種類": "天然氣(NG)",    "熱值": 5925,  "單位": "kcal/m³"},
+            {"能源種類": "外購電力",       "熱值": 860,   "單位": "kcal/kWh"},
+            {"能源種類": "燃料煤",        "熱值": 5890,  "單位": "kcal/kg"},
+        ])
+        st.dataframe(df_heat, hide_index=True, use_container_width=True)
+
+        st.markdown("#### 換算說明")
+        st.info("""
+- 液化石油氣：1 公斤＝1.818 公升（一般）
+- 液化天然氣：1 公斤（液態）≒1.320 立方公尺（氣態）≒2.207 公升（液態）
+- 丙烷混合氣：1 公斤＝1.095 立方公尺＝1.786 公升
+- 1 公斤油當量 = 10,000 千卡
+- 1 kWh = 3,600 kJ（千焦耳）
+- 1 kcal = 4.184 kJ
+- 1 kWh = 3,600 kJ = 3,600/4.184 kcal = 860.4 kcal
+- 1 Mcal = 1,000 kcal = 860.4 kcal/kWh = 1.1628 kWh
+        """)
+
+    # ── Tab 2：換算表（能源使用）
+    with tab2:
+        st.markdown("#### 各項能源使用換算表")
+        df_conv = pd.DataFrame([
+            {
+                "能源種類": "燃料油", "使用量": "-", "單位": "公秉",
+                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
+                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "-"
+            },
+            {
+                "能源種類": "汽油", "使用量": "1.0681", "單位": "公秉",
+                "用電量(kWh/公秉)": "9,339.490", "熱值(Mcal/L)": "8,031.962",
+                "油當量值(kLOE/公秉)": "0.80", "溫室氣體排放量(公噸CO₂e/公秉)": "2.4650"
+            },
+            {
+                "能源種類": "柴油", "使用量": "2.0023", "單位": "公秉",
+                "用電量(kWh/公秉)": "20,090.118", "熱值(Mcal/L)": "17,277.502",
+                "油當量值(kLOE/公秉)": "1.73", "溫室氣體排放量(公噸CO₂e/公秉)": "6.2700"
+            },
+            {
+                "能源種類": "液化石油氣(LPG)", "使用量": "-", "單位": "公秉",
+                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
+                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "0.0000"
+            },
+            {
+                "能源種類": "天然氣(NG)", "使用量": "-", "單位": "千立方公尺",
+                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
+                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "0.0000"
+            },
+            {
+                "能源種類": "外購電力", "使用量": "1,911.6410", "單位": "千度",
+                "用電量(kWh/公秉)": "1,911,641.00", "熱值(Mcal/L)": "1,644,011.26",
+                "油當量值(kLOE/公秉)": "164.40", "溫室氣體排放量(公噸CO₂e/公秉)": "906.1178"
+            },
+            {
+                "能源種類": "燃料煤", "使用量": "-", "單位": "公噸",
+                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
+                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "0.0000"
+            },
+        ])
+        st.dataframe(df_conv, hide_index=True, use_container_width=True)
+
+        # 摘要 KPI
+        st.markdown("<br>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("外購電力用電量", "1,911,641 kWh", "千度")
+        c2.metric("總油當量", "164.40 kLOE", "外購電力")
+        c3.metric("總CO₂排放量", "906.12 公噸CO₂e", "外購電力貢獻")
+
+    # ── Tab 3：油當量表
+    with tab3:
+        st.markdown("#### 各能源油當量換算表")
+        st.caption("資料來源：113年能源統計手冊－能源產品單位熱值表")
+        df_oe = pd.DataFrame([
+            {"能源種類": "燃料油",         "油當量值": 0.9320, "單位": "kLOE/公秉"},
+            {"能源種類": "汽油",           "油當量值": 0.7520, "單位": "kLOE/公秉"},
+            {"能源種類": "柴油",           "油當量值": 0.8629, "單位": "kLOE/公秉"},
+            {"能源種類": "液化石油氣(LPG)", "油當量值": 0.5958, "單位": "kLOE/公秉"},
+            {"能源種類": "天然氣(NG)",     "油當量值": 0.5925, "單位": "kLOE/立方公尺"},
+            {"能源種類": "外購電力",        "油當量值": 0.0860, "單位": "kLOE/千度"},
+            {"能源種類": "燃料煤",         "油當量值": 0.5890, "單位": "kLOE/公噸"},
+        ])
+        st.dataframe(df_oe, hide_index=True, use_container_width=True)
+
+    # ── Tab 4：溫室氣體排放數據
+    with tab4:
+        st.markdown("#### 溫室氣體排放數據（類別1＋類別2）")
+
+        # 摘要卡片
+        g1, g2, g3, g4 = st.columns(4)
+        g1.metric("汽油排放",   "2.4650 公噸CO₂e", "類別1－移動源")
+        g2.metric("柴油排放",   "6.2700 公噸CO₂e", "類別1－移動源")
+        g3.metric("外購電力排放", "906.1178 公噸CO₂e", "類別2")
+        g4.metric("總排放量",   "909.11 公噸CO₂e", "合計")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 排放明細")
+        df_ghg = pd.DataFrame([
+            {
+                "項次": 1, "設備名稱": "資車・公務車", "類別": "類別1",
+                "子類別": "1.2移動燃燒直接排放", "原燃料": "汽油",
+                "活動數量": 1.0681, "活動數量單位": "公秉",
+                "CO₂排放量(公噸/年)": 2.3580, "GWP": 1.0,
+                "排放量(公噸CO₂e/年)": 2.3580
+            },
+            {
+                "項次": 2, "設備名稱": "資車", "類別": "類別1",
+                "子類別": "1.2移動燃燒直接排放", "原燃料": "柴油",
+                "活動數量": 2.0023, "活動數量單位": "公秉",
+                "CO₂排放量(公噸/年)": 3.0478, "GWP": 1.0,
+                "排放量(公噸CO₂e/年)": 3.0478
+            },
+            {
+                "項次": 3, "設備名稱": "堆高機", "類別": "類別1",
+                "子類別": "1.2移動燃燒直接排放", "原燃料": "柴油",
+                "活動數量": 2.0023, "活動數量單位": "公秉",
+                "CO₂排放量(公噸/年)": 3.1244, "GWP": 1.0,
+                "排放量(公噸CO₂e/年)": 3.1244
+            },
+            {
+                "項次": 4, "設備名稱": "未量測設定", "類別": "類別2",
+                "子類別": "2.1輸入電力的間接排放", "原燃料": "外購電力",
+                "活動數量": 1911.6410, "活動數量單位": "千度",
+                "CO₂排放量(公噸/年)": 906.1178, "GWP": 1.0,
+                "排放量(公噸CO₂e/年)": 906.1178
+            },
+        ])
+        st.dataframe(df_ghg, hide_index=True, use_container_width=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 排放量圓餅圖
+        fig_ghg = go.Figure(go.Pie(
+            labels=["汽油（公務車）", "柴油（資車）", "柴油（堆高機）", "外購電力"],
+            values=[2.4650, 3.0478, 3.1244, 906.1178],
+            hole=0.40,
+            marker_colors=["#3b82f6", "#f59e0b", "#ef4444", "#22c55e"],
+            textinfo="percent+label",
+            hovertemplate="<b>%{label}</b><br>%{value:.4f} 公噸CO₂e<br>%{percent}<extra></extra>",
+        ))
+        fig_ghg.update_layout(
+            title=dict(text="溫室氣體排放來源分布", x=0.5, font=dict(size=15)),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+            margin=dict(t=50, b=80, l=20, r=20),
+            height=400,
+        )
+        st.plotly_chart(fig_ghg, use_container_width=True)
+
+        st.info("""
+**排放係數來源：**
+- 溫室氣體排放係數管理表6.0.4版
+- 國家溫室氣體排放係數：汽油(移動) / 柴油(固定)
+- 來源：(5)國家排放係數
+        """)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 頁面三：每日負載分析
