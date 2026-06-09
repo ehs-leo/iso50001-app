@@ -432,15 +432,20 @@ if "儀表板" in menu:
                 hovertemplate="<b>%{label}</b><br>%{value:,.0f} kWh<br>%{percent}<extra></extra>"
             )
             fig_pie.update_layout(
-                title=dict(text="全廠區用電數據", x=0.5, xanchor="center", y=0.02, yanchor="bottom", font=dict(size=16, color="#1a3a5c")),
+                title=dict(
+                    text="全廠區用電數據",
+                    x=0.5, xanchor="center",
+                    y=0.04, yanchor="bottom",
+                    font=dict(size=16, color="#1a3a5c")
+                ),
                 legend=dict(
                     orientation="v",
                     yanchor="middle", y=0.5,
                     xanchor="left", x=1.02,
                     font=dict(size=13)
                 ),
-                margin=dict(t=50, b=20, l=20, r=120),
-                height=380,
+                margin=dict(t=20, b=60, l=20, r=120),
+                height=400,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
