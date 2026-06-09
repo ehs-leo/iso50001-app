@@ -435,17 +435,17 @@ if "儀表板" in menu:
                 title=dict(
                     text="全廠區用電數據",
                     x=0.5, xanchor="center",
-                    y=0.04, yanchor="bottom",
+                    y=0.0, yanchor="bottom",
                     font=dict(size=16, color="#1a3a5c")
                 ),
                 legend=dict(
-                    orientation="v",
-                    yanchor="middle", y=0.5,
-                    xanchor="left", x=1.02,
-                    font=dict(size=13)
+                    orientation="h",
+                    yanchor="top", y=-0.12,
+                    xanchor="center", x=0.5,
+                    font=dict(size=12)
                 ),
-                margin=dict(t=20, b=60, l=20, r=120),
-                height=400,
+                margin=dict(t=20, b=100, l=20, r=20),
+                height=430,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
