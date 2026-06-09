@@ -531,17 +531,20 @@ if "儀表板" in menu:
             hovertemplate="<b>%{label}</b><br>占比：%{value:.2f}%<extra></extra>",
         ))
         fig_energy.update_layout(
-            title=dict(text="各項能源耗能占比", x=0.5, xanchor="center",
-                       y=0.95, yanchor="top",
-                       font=dict(size=16, color="#1a3a5c")),
+            title=dict(
+                text="各項能源耗能占比",
+                x=0.5, xanchor="center",
+                y=0.0, yanchor="bottom",
+                font=dict(size=16, color="#1a3a5c")
+            ),
             legend=dict(
                 orientation="h",
-                yanchor="bottom", y=-0.20,
+                yanchor="bottom", y=-0.25,
                 xanchor="center", x=0.5,
                 font=dict(size=13)
             ),
-            margin=dict(t=60, b=80, l=20, r=20),
-            height=420,
+            margin=dict(t=20, b=140, l=20, r=20),
+            height=480,
         )
         st.plotly_chart(fig_energy, use_container_width=True)
 
@@ -1050,13 +1053,20 @@ elif "能源換算" in menu:
             hovertemplate="<b>%{label}</b><br>%{value:.4f} 公噸CO₂e<br>%{percent}<extra></extra>",
         ))
         fig_ghg.update_layout(
-            title=dict(text="溫室氣體排放來源分布", x=0.5, xanchor="center",
-                       y=0.95, yanchor="top",
-                       font=dict(size=16, color="#1a3a5c")),
-            legend=dict(orientation="h", yanchor="bottom", y=-0.25,
-                        xanchor="center", x=0.5, font=dict(size=12)),
-            margin=dict(t=60, b=100, l=20, r=20),
-            height=440,
+            title=dict(
+                text="溫室氣體排放來源分布",
+                x=0.5, xanchor="center",
+                y=0.0, yanchor="bottom",
+                font=dict(size=16, color="#1a3a5c")
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom", y=-0.25,
+                xanchor="center", x=0.5,
+                font=dict(size=12)
+            ),
+            margin=dict(t=20, b=140, l=20, r=20),
+            height=480,
         )
         st.plotly_chart(fig_ghg, use_container_width=True)
 
