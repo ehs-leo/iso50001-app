@@ -432,7 +432,7 @@ if "儀表板" in menu:
                 hovertemplate="<b>%{label}</b><br>%{value:,.0f} kWh<br>%{percent}<extra></extra>"
             )
             fig_pie.update_layout(
-                title=dict(text="全廠區用電數據", x=0.5, xanchor="center", y=0.97, yanchor="top", font=dict(size=16, color="#1a3a5c")),
+                title=dict(text="全廠區用電數據", x=0.5, xanchor="center", y=0.02, yanchor="bottom", font=dict(size=16, color="#1a3a5c")),
                 legend=dict(
                     orientation="v",
                     yanchor="middle", y=0.5,
