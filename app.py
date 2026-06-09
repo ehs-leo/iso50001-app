@@ -14,6 +14,34 @@ from PIL import Image
 from datetime import datetime
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Helper: 置中表格
+# ─────────────────────────────────────────────────────────────────────────────
+def centered_table(df):
+    """將 DataFrame 轉為文字置中的 HTML 表格"""
+    styles = """
+    <style>
+    .ctable { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:8px; }
+    .ctable th {
+        background:#1a3a5c; color:#fff; padding:9px 12px;
+        text-align:center; font-weight:600; border:1px solid #334155;
+    }
+    .ctable td {
+        padding:8px 12px; text-align:center;
+        border:1px solid #e2e8f0; color:#1e293b;
+    }
+    .ctable tr:nth-child(even) td { background:#f8fafc; }
+    .ctable tr:hover td { background:#eff6ff; }
+    </style>
+    """
+    rows_html = ""
+    for _, row in df.iterrows():
+        cells = "".join(f"<td>{v}</td>" for v in row.values)
+        rows_html += f"<tr>{cells}</tr>"
+    headers = "".join(f"<th>{col}</th>" for col in df.columns)
+    html = f"""{styles}<table class="ctable"><thead><tr>{headers}</tr></thead><tbody>{rows_html}</tbody></table>"""
+    st.markdown(html, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 0. 頁面設定
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -47,6 +75,16 @@ st.markdown("""
     background:#eff6ff; border-left:5px solid #2563a8;
     padding:12px 16px; border-radius:6px; color:#1e40af; font-size:14px;
   }
+  /* 表格文字置中 */
+  [data-testid="stDataFrame"] td,
+  [data-testid="stDataFrame"] th {
+    text-align: center !important;
+    justify-content: center !important;
+  }
+  [data-testid="stDataFrame"] [data-testid="glideDataEditor"] .dvn-stack {
+    justify-content: center !important;
+  }
+  .dvn-stack span { text-align: center !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -394,7 +432,7 @@ if "儀表板" in menu:
                 hovertemplate="<b>%{label}</b><br>%{value:,.0f} kWh<br>%{percent}<extra></extra>"
             )
             fig_pie.update_layout(
-                title=dict(text="各系統能耗佔比", x=0.5, font=dict(size=15)),
+                title=dict(text="全廠區用電數據", x=0.5, xanchor="center", y=0.97, yanchor="top", font=dict(size=16, color="#1a3a5c")),
                 legend=dict(
                     orientation="v",
                     yanchor="middle", y=0.5,
@@ -436,7 +474,7 @@ if "儀表板" in menu:
         df_show = df_sys.copy()
         df_show["耗電量(kWh/年)"] = df_show["耗電量(kWh/年)"].apply(lambda v: f"{v:,.0f}")
         df_show["佔比(%)"]        = df_show["佔比(%)"].apply(lambda v: f"{v:.1f}%")
-        st.dataframe(df_show, hide_index=True, use_container_width=True)
+        centered_table(df_show)
 
     # A 級設備清單
     a_rows = sorted([r for r in rows if r["_seu"] == "A"],
@@ -444,7 +482,7 @@ if "儀表板" in menu:
     if a_rows:
         st.divider()
         st.subheader("⭐ A 級重大耗能設備（依耗電量排序）")
-        st.dataframe(pd.DataFrame([{
+        centered_table(pd.DataFrame([{
             "系統":         r.get("系統別", ""),
             "設備名稱":     r.get("設備名稱", ""),
             "編號":         r.get("設備編號", ""),
@@ -488,7 +526,7 @@ if "儀表板" in menu:
             hovertemplate="<b>%{label}</b><br>占比：%{value:.2f}%<extra></extra>",
         ))
         fig_energy.update_layout(
-            title=dict(text="各項能源耗能占比", x=0.5, font=dict(size=15)),
+            title=dict(text="各項能源耗能占比", x=0.5, xanchor="center", y=0.97, yanchor="top", font=dict(size=16, color="#1a3a5c", family="Microsoft JhengHei")),
             legend=dict(
                 orientation="h",
                 yanchor="bottom", y=-0.15,
@@ -754,7 +792,7 @@ elif "評分標準" in menu:
             "鑑別因子": ["設備耗能估比", "工廠自評重大性（設備管控評估）", "總計"],
             "估比":     ["50%", "50%", "100%"],
         })
-        st.dataframe(df_w1, hide_index=True, use_container_width=False)
+        centered_table(df_w1)
 
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2 = st.columns(2)
@@ -765,7 +803,7 @@ elif "評分標準" in menu:
                 "耗能估比範圍": ["— ～ 0.24%", "0.25% ～ 0.49%", "0.50% ～ 0.74%", "0.75% ～", "1.00% ～"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            st.dataframe(df_s1, hide_index=True, use_container_width=True)
+            centered_table(df_s1)
 
         with col2:
             st.markdown("##### 工廠自評重大性評分")
@@ -774,7 +812,7 @@ elif "評分標準" in menu:
                 "說明": ["非重要管控項目", "", "需再評估", "", "既有或應該列入管控"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            st.dataframe(df_s2, hide_index=True, use_container_width=True)
+            centered_table(df_s2)
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 重大能源使用鑑別級距")
@@ -783,7 +821,7 @@ elif "評分標準" in menu:
             "級別": ["-", "-", "-", "A"],
             "說明": ["一般設備", "一般設備", "一般設備", "重大能源使用設備（SEU）"],
         })
-        st.dataframe(df_seu, hide_index=True, use_container_width=True)
+        centered_table(df_seu)
 
         st.info("**計算公式：** 重大性評分 = 設備耗能估比分數 × 50% ＋ 工廠自評重大性分數 × 50%\n\n評分 ≥ 4.0 分 → 鑑別為 **A 級重大能源使用設備（SEU）**，需研提能源管理行動計畫並制訂操作規範。\n\n> 📝 備註：管控可為 SOP 或即時監控")
 
@@ -793,7 +831,7 @@ elif "評分標準" in menu:
             "鑑別因子":     ["設備耗能估比", "設備老舊度", "設備運轉度", "能效改善頻率", "改善執行難易度", "總計"],
             "估比":         ["15%", "30%", "5%", "20%", "30%", "100%"],
         })
-        st.dataframe(df_w2, hide_index=True, use_container_width=False)
+        centered_table(df_w2)
 
         st.markdown("<br>", unsafe_allow_html=True)
         col3, col4 = st.columns(2)
@@ -804,21 +842,21 @@ elif "評分標準" in menu:
                 "耗能估比範圍": ["0% ～ 0.1%", "0.1% ～ 0.1%", "0.1% ～ 0.4%", "0.5% ～ 1.0%", "1.0% ～"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            st.dataframe(df_p1, hide_index=True, use_container_width=True)
+            centered_table(df_p1)
 
             st.markdown("##### 設備老舊度評分")
             df_p2 = pd.DataFrame({
                 "使用年數": ["0 ～ 4 年", "5 ～ 9 年", "10 ～ 14 年", "15 ～ 19 年", "20 年以上"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            st.dataframe(df_p2, hide_index=True, use_container_width=True)
+            centered_table(df_p2)
 
             st.markdown("##### 設備運轉度評分")
             df_p3 = pd.DataFrame({
                 "年運轉時數": ["0 ～ 1,460 小時", "1,461 ～ 2,920 小時", "2,921 ～ 4,380 小時", "4,381 ～ 5,840 小時", "5,841 ～ 8,760 小時"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            st.dataframe(df_p3, hide_index=True, use_container_width=True)
+            centered_table(df_p3)
 
         with col4:
             st.markdown("##### 能效改善頻率評分")
@@ -826,14 +864,14 @@ elif "評分標準" in menu:
                 "改善頻率": ["# ～ 1（5年內新機）", "2 ～ 2", "3 ～ 3（10年以上能效改善1次）", "4 ～ 4", "5 ～ 5（10年以上從未改善）"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            st.dataframe(df_p4, hide_index=True, use_container_width=True)
+            centered_table(df_p4)
 
             st.markdown("##### 改善執行難易度評分")
             df_p5 = pd.DataFrame({
                 "難易度": ["# ～ 1（不會改善）", "2 ～ 2", "3 ～ 3（需再評估）", "4 ～ 4", "5 ～ 5（可立即改善）"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            st.dataframe(df_p5, hide_index=True, use_container_width=True)
+            centered_table(df_p5)
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 優先改善項目鑑別級距")
@@ -842,7 +880,7 @@ elif "評分標準" in menu:
             "級別": ["-", "-", "-", "I"],
             "說明": ["一般設備", "一般設備", "一般設備", "優先改善項目"],
         })
-        st.dataframe(df_pri, hide_index=True, use_container_width=True)
+        centered_table(df_pri)
 
         st.info("**計算公式：** 優先改善評分 = 耗能估比分數 × 15% ＋ 老舊度分數 × 30% ＋ 運轉度分數 × 5% ＋ 改善頻率分數 × 20% ＋ 改善難易度分數 × 30%\n\n評分 ≥ 4.0 分 → 鑑別為 **I 級優先改善項目**，需優先執行能效改善作業。")
 
@@ -870,7 +908,7 @@ elif "能源換算" in menu:
             {"能源種類": "外購電力",       "熱值": 860,   "單位": "kcal/kWh"},
             {"能源種類": "燃料煤",        "熱值": 5890,  "單位": "kcal/kg"},
         ])
-        st.dataframe(df_heat, hide_index=True, use_container_width=True)
+        centered_table(df_heat)
 
         st.markdown("#### 換算說明")
         st.info("""
@@ -924,7 +962,7 @@ elif "能源換算" in menu:
                 "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "0.0000"
             },
         ])
-        st.dataframe(df_conv, hide_index=True, use_container_width=True)
+        centered_table(df_conv)
 
         # 摘要 KPI
         st.markdown("<br>", unsafe_allow_html=True)
@@ -946,7 +984,7 @@ elif "能源換算" in menu:
             {"能源種類": "外購電力",        "油當量值": 0.0860, "單位": "kLOE/千度"},
             {"能源種類": "燃料煤",         "油當量值": 0.5890, "單位": "kLOE/公噸"},
         ])
-        st.dataframe(df_oe, hide_index=True, use_container_width=True)
+        centered_table(df_oe)
 
     # ── Tab 4：溫室氣體排放數據
     with tab4:
@@ -991,7 +1029,7 @@ elif "能源換算" in menu:
                 "排放量(公噸CO₂e/年)": 906.1178
             },
         ])
-        st.dataframe(df_ghg, hide_index=True, use_container_width=True)
+        centered_table(df_ghg)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1005,7 +1043,7 @@ elif "能源換算" in menu:
             hovertemplate="<b>%{label}</b><br>%{value:.4f} 公噸CO₂e<br>%{percent}<extra></extra>",
         ))
         fig_ghg.update_layout(
-            title=dict(text="溫室氣體排放來源分布", x=0.5, font=dict(size=15)),
+            title=dict(text="溫室氣體排放來源分布", x=0.5, xanchor="center", y=0.97, yanchor="top", font=dict(size=16, color="#1a3a5c", family="Microsoft JhengHei")),
             legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
             margin=dict(t=50, b=80, l=20, r=20),
             height=400,
@@ -1074,7 +1112,7 @@ elif "負載" in menu:
               f"比值 {round(pk['最高用電(kW)']/of['最低用電(kW)'],2):.2f}x")
 
     st.divider()
-    st.dataframe(df_load, hide_index=True, use_container_width=True)
+    centered_table(df_load)
     st.download_button(
         "⬇️ 下載負載曲線 CSV",
         df_load.to_csv(index=False).encode("utf-8-sig"),
