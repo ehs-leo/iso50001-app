@@ -444,8 +444,8 @@ if "儀表板" in menu:
                     xanchor="center", x=0.5,
                     font=dict(size=12)
                 ),
-                margin=dict(t=20, b=100, l=20, r=20),
-                height=430,
+                margin=dict(t=60, b=140, l=20, r=20),
+                height=520,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
@@ -527,7 +527,9 @@ if "儀表板" in menu:
             values=[v["pct"] for v in ENERGY_DATA.values()],
             hole=0.40,
             marker_colors=["#3b82f6", "#ef4444", "#22c55e"],
-            textinfo="percent+label",
+            textinfo="percent",
+            textposition="inside",
+            insidetextorientation="radial",
             hovertemplate="<b>%{label}</b><br>占比：%{value:.2f}%<extra></extra>",
         ))
         fig_energy.update_layout(
@@ -543,8 +545,8 @@ if "儀表板" in menu:
                 xanchor="center", x=0.5,
                 font=dict(size=13)
             ),
-            margin=dict(t=20, b=140, l=20, r=20),
-            height=480,
+            margin=dict(t=60, b=140, l=20, r=20),
+            height=520,
         )
         st.plotly_chart(fig_energy, use_container_width=True)
 
@@ -1049,7 +1051,9 @@ elif "能源換算" in menu:
             values=[2.4650, 3.0478, 3.1244, 906.1178],
             hole=0.40,
             marker_colors=["#3b82f6", "#f59e0b", "#ef4444", "#22c55e"],
-            textinfo="percent+label",
+            textinfo="percent",
+            textposition="inside",
+            insidetextorientation="radial",
             hovertemplate="<b>%{label}</b><br>%{value:.4f} 公噸CO₂e<br>%{percent}<extra></extra>",
         ))
         fig_ghg.update_layout(
@@ -1065,8 +1069,8 @@ elif "能源換算" in menu:
                 xanchor="center", x=0.5,
                 font=dict(size=12)
             ),
-            margin=dict(t=20, b=140, l=20, r=20),
-            height=480,
+            margin=dict(t=60, b=140, l=20, r=20),
+            height=520,
         )
         st.plotly_chart(fig_ghg, use_container_width=True)
 
