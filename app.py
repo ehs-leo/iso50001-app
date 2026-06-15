@@ -432,22 +432,17 @@ if "儀表板" in menu:
                 hovertemplate="<b>%{label}</b><br>%{value:,.0f} kWh<br>%{percent}<extra></extra>"
             )
             fig_pie.update_layout(
-                title=dict(
-                    text="全廠區用電數據",
-                    x=0.5, xanchor="center",
-                    y=0.0, yanchor="bottom",
-                    font=dict(size=16, color="#1a3a5c")
-                ),
                 legend=dict(
                     orientation="h",
-                    yanchor="top", y=-0.12,
+                    yanchor="top", y=-0.05,
                     xanchor="center", x=0.5,
                     font=dict(size=12)
                 ),
-                margin=dict(t=60, b=140, l=20, r=20),
-                height=520,
+                margin=dict(t=20, b=60, l=20, r=20),
+                height=400,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
+            st.markdown("<p style='text-align:center;font-size:16px;font-weight:700;color:#1a3a5c;'>全廠區用電數據</p>", unsafe_allow_html=True)
         else:
             st.info("無耗電量資料，無法顯示圓餅圖。")
 
@@ -533,22 +528,17 @@ if "儀表板" in menu:
             hovertemplate="<b>%{label}</b><br>占比：%{value:.2f}%<extra></extra>",
         ))
         fig_energy.update_layout(
-            title=dict(
-                text="各項能源耗能占比",
-                x=0.5, xanchor="center",
-                y=0.0, yanchor="bottom",
-                font=dict(size=16, color="#1a3a5c")
-            ),
             legend=dict(
                 orientation="h",
-                yanchor="bottom", y=-0.25,
+                yanchor="top", y=-0.05,
                 xanchor="center", x=0.5,
                 font=dict(size=13)
             ),
-            margin=dict(t=60, b=140, l=20, r=20),
-            height=520,
+            margin=dict(t=20, b=60, l=20, r=20),
+            height=400,
         )
         st.plotly_chart(fig_energy, use_container_width=True)
+        st.markdown("<p style='text-align:center;font-size:16px;font-weight:700;color:#1a3a5c;'>各項能源耗能占比</p>", unsafe_allow_html=True)
 
     with e_col2:
         st.markdown("##### 各項能源耗能數據")
@@ -1057,22 +1047,17 @@ elif "能源換算" in menu:
             hovertemplate="<b>%{label}</b><br>%{value:.4f} 公噸CO₂e<br>%{percent}<extra></extra>",
         ))
         fig_ghg.update_layout(
-            title=dict(
-                text="溫室氣體排放來源分布",
-                x=0.5, xanchor="center",
-                y=0.0, yanchor="bottom",
-                font=dict(size=16, color="#1a3a5c")
-            ),
             legend=dict(
                 orientation="h",
-                yanchor="bottom", y=-0.25,
+                yanchor="top", y=-0.05,
                 xanchor="center", x=0.5,
                 font=dict(size=12)
             ),
-            margin=dict(t=60, b=140, l=20, r=20),
-            height=520,
+            margin=dict(t=20, b=60, l=20, r=20),
+            height=400,
         )
         st.plotly_chart(fig_ghg, use_container_width=True)
+        st.markdown("<p style='text-align:center;font-size:16px;font-weight:700;color:#1a3a5c;'>溫室氣體排放來源分布</p>", unsafe_allow_html=True)
 
         st.info("""
 **排放係數來源：**
