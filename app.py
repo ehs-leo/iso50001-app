@@ -356,6 +356,82 @@ if not os.path.exists(EXCEL_FILE) and len(st.session_state["db"]) == 0:
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 頁面一：全廠能耗儀表板
 # ─────────────────────────────────────────────────────────────────────────────
+def _render_equipment_detail(r, db_idx, loop_idx):
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("消耗功率",   f"{r.get('消耗功率(kW)','')} kW")
+    d2.metric("年運轉時數", f"{float(r.get('運轉時數(hr/年)') or 0):,.0f} hr")
+    d3.metric("使用年數",   f"{int(r.get('使用年數') or 0)} 年")
+    d4.metric("重大性評分", r["_sc"])
+    col_info, col_photo = st.columns([1, 1])
+    with col_info:
+        load_pct = f"{float(r.get('負載率',0))*100:.0f}%" if r.get('負載率') else "—"
+        st.markdown(f"""
+| 欄位 | 資料 |
+|------|------|
+| 部門 | {r.get('設備部門','—')} |
+| 棟別/樓層 | {r.get('所在棟別','—')} / {r.get('所在樓層','—')} |
+| 型式說明 | {r.get('設備型式','—')} |
+| 數量 | {r.get('設備數量','—')} 台 |
+| 負載率 | {load_pct} |
+| 設備年份 | {r.get('設備年份','—')} |
+| 管理者 | {r.get('設備管理者','—')} |
+| 外包商 | {r.get('外包商承攬商','—')} |
+| **年耗電量** | **{r['_kwh']:,.0f} kWh** |
+| **SEU 鑑別** | **{'⭐ A 級' if r["_seu"]=='A' else '一般設備'}** |
+""")
+    with col_photo:
+        st.markdown("**📷 設備影像**")
+        ph1, ph2 = st.columns(2)
+        with ph1:
+            st.caption("外觀照片")
+            if r.get("外觀照片"):
+                try: st.image(Image.open(BytesIO(base64.b64decode(r["外觀照片"]))), use_container_width=True)
+                except: st.warning("照片解碼失敗")
+            else: st.info("未上傳")
+        with ph2:
+            st.caption("銘牌照片")
+            if r.get("銘牌照片"):
+                try: st.image(Image.open(BytesIO(base64.b64decode(r["銘牌照片"]))), use_container_width=True)
+                except: st.warning("照片解碼失敗")
+            else: st.info("未上傳")
+    if st.session_state["edit_mode"] and db_idx is not None:
+        st.markdown("---")
+        cur = st.session_state["db"][db_idx]
+        with st.form(f"ef_{loop_idx}_{db_idx}"):
+            e1, e2, e3 = st.columns(3)
+            with e1:
+                e_name = st.text_input("設備名稱", value=str(cur.get("設備名稱","") or ""))
+                e_id   = st.text_input("設備編號", value=str(cur.get("設備編號","") or ""))
+                e_dept = st.text_input("部門",     value=str(cur.get("設備部門","") or ""))
+            with e2:
+                e_kw   = st.number_input("消耗功率(kW)", value=float(cur.get("消耗功率(kW)") or 0), min_value=0.0, step=0.1)
+                e_qty  = st.number_input("設備數量", value=int(cur.get("設備數量") or 1), min_value=1)
+                e_load = st.slider("負載率", 0.1, 1.0, float(cur.get("負載率") or 0.8), 0.05)
+            with e3:
+                e_hrs  = st.number_input("年運轉時數", value=float(cur.get("運轉時數(hr/年)") or 0), min_value=0.0)
+                e_crit = st.slider("自評重大性", 1, 5, int(cur.get("自評重大性") or 3))
+                e_mgr  = st.text_input("設備管理者", value=str(cur.get("設備管理者","") or ""))
+            up1 = st.file_uploader("更新外觀照片", type=["jpg","jpeg","png"], key=f"u1_{loop_idx}_{db_idx}")
+            up2 = st.file_uploader("更新銘牌照片", type=["jpg","jpeg","png"], key=f"u2_{loop_idx}_{db_idx}")
+            sv, dl = st.columns([3,1])
+            with sv: save_ok = st.form_submit_button("💾 儲存變更", use_container_width=True)
+            with dl: del_ok  = st.form_submit_button("🗑️ 刪除", use_container_width=True)
+            if save_ok:
+                st.session_state["db"][db_idx].update({
+                    "設備名稱":e_name,"設備編號":e_id,"設備部門":e_dept,
+                    "消耗功率(kW)":e_kw,"設備數量":e_qty,"負載率":e_load,
+                    "運轉時數(hr/年)":e_hrs,"自評重大性":e_crit,"設備管理者":e_mgr,
+                })
+                if up1: st.session_state["db"][db_idx]["外觀照片"] = base64.b64encode(up1.read()).decode()
+                if up2: st.session_state["db"][db_idx]["銘牌照片"] = base64.b64encode(up2.read()).decode()
+                save_json(st.session_state["db"])
+                st.success("✅ 已儲存！"); st.rerun()
+            if del_ok:
+                st.session_state["db"].pop(db_idx)
+                save_json(st.session_state["db"])
+                st.warning("已刪除。"); st.rerun()
+
+
 if "儀表板" in menu:
     rows = all_calc()
 
@@ -610,8 +686,76 @@ elif "設備盤查" in menu:
                         st.success(f"✅ 設備【{in_name}】已寫入！")
                         st.rerun()
 
-    # 篩選列
-    fc1, fc2, fc3 = st.columns([2, 1, 1])
+    # ── 搜尋 + 重大性篩選
+    kw_f  = st.text_input("🔍 搜尋設備名稱 / 編號 / 部門（跨系統搜尋）")
+    seu_f = st.selectbox("重大性篩選", ["全部", "A 級重大設備", "一般設備"])
+    rows  = all_calc()
+
+    def get_db_idx(r):
+        return next((i for i,d in enumerate(st.session_state["db"])
+                     if str(d.get("設備名稱",""))==str(r.get("設備名稱",""))
+                     and str(d.get("設備編號",""))==str(r.get("設備編號",""))
+                     and str(d.get("系統別",""))  ==str(r.get("系統別",""))), None)
+
+    if kw_f:
+        # ── 搜尋模式
+        filtered = [r for r in rows
+                    if (seu_f=="全部" or (seu_f=="A 級重大設備" and r["_seu"]=="A") or (seu_f=="一般設備" and r["_seu"]!="-"))
+                    and kw_f.lower() in f"{r.get('設備名稱','')} {r.get('設備編號','')} {r.get('設備部門','')}".lower()]
+        st.caption(f"搜尋結果：**{len(filtered)}** 筆")
+        for li, r in enumerate(filtered):
+            icon  = SYSTEM_ICONS.get(r.get("系統別",""), "🔧")
+            a_tag = " ⭐A級" if r["_seu"]=="A" else ""
+            title = f"{icon}[{r.get('系統別','')}] {r.get('設備名稱','')} ({r.get('設備編號','')})  ｜  {r['_kwh']:,.0f} kWh  評分{r['_sc']}{a_tag}"
+            with st.expander(title, expanded=False):
+                _render_equipment_detail(r, get_db_idx(r), li)
+    else:
+        # ── 系統分頁模式
+        sys_rows = {}
+        for r in rows:
+            if seu_f=="A 級重大設備" and r["_seu"]!="A": continue
+            if seu_f=="一般設備" and r["_seu"]=="A": continue
+            s = r.get("系統別","其他")
+            sys_rows.setdefault(s,[]).append(r)
+
+        # 摘要卡片
+        card_cols = st.columns(len(sys_rows))
+        for i,(sn,sl) in enumerate(sys_rows.items()):
+            a_cnt = sum(1 for r in sl if r["_seu"]=="A")
+            icon = SYSTEM_ICONS.get(sn,"🔧")
+            card_cols[i].markdown(f"""
+<div style='background:#fff;border-radius:10px;padding:12px;
+            box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;
+            border-top:3px solid #2563a8;'>
+  <div style='font-size:24px'>{icon}</div>
+  <div style='font-size:13px;font-weight:700;color:#1a3a5c'>{sn}</div>
+  <div style='font-size:22px;font-weight:800;color:#2563a8'>{len(sl)}</div>
+  <div style='font-size:11px;color:#64748b'>台設備</div>
+  <div style='font-size:11px;color:#f59e0b;font-weight:600'>A級：{a_cnt} 台</div>
+  <div style='font-size:10px;color:#94a3b8'>{sum(r["_kwh"] for r in sl):,.0f} kWh/年</div>
+</div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 系統 Tabs
+        tab_names = [f"{SYSTEM_ICONS.get(s,'🔧')} {s}（{len(v)}台）" for s,v in sys_rows.items()]
+        tabs = st.tabs(tab_names)
+        for tab,(sn,sl) in zip(tabs,sys_rows.items()):
+            with tab:
+                a_list = [r for r in sl if r["_seu"]=="A"]
+                st.caption(f"共 **{len(sl)}** 台 ｜ A級 **{len(a_list)}** 台 ｜ 年耗電 **{sum(r['_kwh'] for r in sl):,.0f}** kWh")
+                for li,r in enumerate(sl):
+                    a_tag = " ⭐A級" if r["_seu"]=="A" else ""
+                    title = f"{r.get('設備名稱','')} ({r.get('設備編號','')})  ｜  {r['_kwh']:,.0f} kWh/年  評分{r['_sc']}{a_tag}"
+                    with st.expander(title, expanded=False):
+                        _render_equipment_detail(r, get_db_idx(r), li)
+                st.divider()
+                csv_data = pd.DataFrame([{k:v for k,v in r.items() if k not in ("外觀照片","銘牌照片","_kwh","_sc","_seu")} for r in sl]).to_csv(index=False).encode("utf-8-sig")
+                st.download_button(f"⬇️ 匯出 {sn} CSV", csv_data,
+                    f"SEU_{sn}_{datetime.now().strftime('%Y%m%d')}.csv","text/csv",key=f"dl_{sn}")
+
+    if False:  # placeholder to keep old filtered variable in scope
+        filtered = []
     with fc1:
         kw_f  = st.text_input("🔍 搜尋設備名稱 / 編號 / 部門")
     with fc2:
@@ -619,165 +763,9 @@ elif "設備盤查" in menu:
     with fc3:
         seu_f = st.selectbox("重大性篩選", ["全部", "A 級重大設備", "一般設備"])
 
-    rows     = all_calc()
-    filtered = []
-    for r in rows:
-        if sys_f != "全部" and r.get("系統別") != sys_f:
-            continue
-        if seu_f == "A 級重大設備" and r["_seu"] != "A":
-            continue
-        if seu_f == "一般設備" and r["_seu"] == "A":
-            continue
-        if kw_f:
-            s = f"{r.get('設備名稱','')} {r.get('設備編號','')} {r.get('設備部門','')}".lower()
-            if kw_f.lower() not in s:
-                continue
-        filtered.append(r)
 
-    st.caption(f"顯示 **{len(filtered)}** 筆（共 {len(rows)} 筆）")
 
-    for loop_idx, r in enumerate(filtered):
-        db_idx = next(
-            (i for i, d in enumerate(st.session_state["db"])
-             if str(d.get("設備名稱","")) == str(r.get("設備名稱",""))
-             and str(d.get("設備編號","")) == str(r.get("設備編號",""))
-             and str(d.get("系統別",""))   == str(r.get("系統別",""))),
-            None
-        )
 
-        icon  = SYSTEM_ICONS.get(r.get("系統別",""), "🔧")
-        a_tag = " ⭐A級" if r["_seu"] == "A" else ""
-        title = (f"{icon} [{r.get('系統別','')}]  "
-                 f"{r.get('設備名稱','')} ({r.get('設備編號','')})"
-                 f"  ｜  {r['_kwh']:,.0f} kWh/年"
-                 f"  評分 {r['_sc']}{a_tag}")
-
-        with st.expander(title, expanded=False):
-            d1, d2, d3, d4 = st.columns(4)
-            d1.metric("消耗功率",   f"{r.get('消耗功率(kW)','')} kW")
-            d2.metric("年運轉時數", f"{float(r.get('運轉時數(hr/年)') or 0):,.0f} hr")
-            d3.metric("使用年數",   f"{int(r.get('使用年數') or 0)} 年")
-            d4.metric("重大性評分", r["_sc"])
-
-            col_info, col_photo = st.columns([1, 1])
-            with col_info:
-                load_pct = f"{float(r.get('負載率',0))*100:.0f}%" if r.get('負載率') else "—"
-                st.markdown(f"""
-| 欄位 | 資料 |
-|------|------|
-| 部門 | {r.get('設備部門','—')} |
-| 棟別/樓層 | {r.get('所在棟別','—')} / {r.get('所在樓層','—')} |
-| 型式說明 | {r.get('設備型式','—')} |
-| 數量 | {r.get('設備數量','—')} 台 |
-| 負載率 | {load_pct} |
-| 設備年份 | {r.get('設備年份','—')} |
-| 管理者 | {r.get('設備管理者','—')} |
-| 外包商 | {r.get('外包商承攬商','—')} |
-| 相關變數 | {r.get('相關變數','—')} |
-| **年耗電量** | **{r['_kwh']:,.0f} kWh** |
-| **SEU 鑑別** | **{'⭐ A 級重大設備' if r['_seu']=='A' else '一般設備'}** |
-""")
-            with col_photo:
-                st.markdown("**📷 設備影像**")
-                ph1, ph2 = st.columns(2)
-                with ph1:
-                    st.caption("外觀照片")
-                    if r.get("外觀照片"):
-                        try:
-                            st.image(Image.open(BytesIO(base64.b64decode(r["外觀照片"]))),
-                                     use_container_width=True)
-                        except:
-                            st.warning("照片解碼失敗")
-                    else:
-                        st.info("未上傳")
-                with ph2:
-                    st.caption("銘牌照片")
-                    if r.get("銘牌照片"):
-                        try:
-                            st.image(Image.open(BytesIO(base64.b64decode(r["銘牌照片"]))),
-                                     use_container_width=True)
-                        except:
-                            st.warning("照片解碼失敗")
-                    else:
-                        st.info("未上傳")
-
-            # 行內編輯（修改模式）
-            if st.session_state["edit_mode"] and db_idx is not None:
-                st.markdown("---")
-                st.markdown("**✏️ 編輯此設備數據**")
-                cur = st.session_state["db"][db_idx]
-                with st.form(f"ef_{loop_idx}_{db_idx}"):
-                    e1, e2, e3 = st.columns(3)
-                    with e1:
-                        e_name = st.text_input("設備名稱", value=str(cur.get("設備名稱","") or ""))
-                        e_id   = st.text_input("設備編號", value=str(cur.get("設備編號","") or ""))
-                        e_dept = st.text_input("部門",     value=str(cur.get("設備部門","") or ""))
-                    with e2:
-                        e_kw   = st.number_input("消耗功率(kW)",
-                                    value=float(cur.get("消耗功率(kW)") or 0),
-                                    min_value=0.0, step=0.1)
-                        e_qty  = st.number_input("設備數量",
-                                    value=int(cur.get("設備數量") or 1),
-                                    min_value=1)
-                        e_load = st.slider("負載率", 0.1, 1.0,
-                                    float(cur.get("負載率") or 0.8), 0.05)
-                    with e3:
-                        e_hrs  = st.number_input("年運轉時數",
-                                    value=float(cur.get("運轉時數(hr/年)") or 0),
-                                    min_value=0.0)
-                        e_crit = st.slider("自評重大性(1~5)", 1, 5,
-                                    int(cur.get("自評重大性") or 3))
-                        e_mgr  = st.text_input("設備管理者",
-                                    value=str(cur.get("設備管理者","") or ""))
-
-                    up1 = st.file_uploader("更新外觀照片（留空保留原圖）",
-                                type=["jpg","jpeg","png"], key=f"u1_{loop_idx}_{db_idx}")
-                    up2 = st.file_uploader("更新銘牌照片（留空保留原圖）",
-                                type=["jpg","jpeg","png"], key=f"u2_{loop_idx}_{db_idx}")
-
-                    sv, dl = st.columns([3, 1])
-                    with sv:
-                        save_ok = st.form_submit_button("💾 儲存變更", use_container_width=True)
-                    with dl:
-                        del_ok  = st.form_submit_button("🗑️ 刪除設備", use_container_width=True)
-
-                    if save_ok:
-                        st.session_state["db"][db_idx].update({
-                            "設備名稱": e_name, "設備編號": e_id, "設備部門": e_dept,
-                            "消耗功率(kW)": e_kw, "設備數量": e_qty, "負載率": e_load,
-                            "運轉時數(hr/年)": e_hrs, "自評重大性": e_crit,
-                            "設備管理者": e_mgr,
-                        })
-                        if up1:
-                            st.session_state["db"][db_idx]["外觀照片"] = \
-                                base64.b64encode(up1.read()).decode()
-                        if up2:
-                            st.session_state["db"][db_idx]["銘牌照片"] = \
-                                base64.b64encode(up2.read()).decode()
-                        save_json(st.session_state["db"])
-                        st.success("✅ 已儲存！")
-                        st.rerun()
-
-                    if del_ok:
-                        st.session_state["db"].pop(db_idx)
-                        save_json(st.session_state["db"])
-                        st.warning("已刪除。")
-                        st.rerun()
-
-    # 匯出 CSV
-    st.divider()
-    if filtered:
-        exp_data = [
-            {k: v for k, v in r.items()
-             if k not in ("外觀照片","銘牌照片","_kwh","_sc","_seu")}
-            for r in filtered
-        ]
-        csv = pd.DataFrame(exp_data).to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "⬇️ 匯出篩選結果 CSV", csv,
-            f"SEU_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            "text/csv"
-        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
