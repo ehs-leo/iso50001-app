@@ -724,15 +724,15 @@ elif "設備盤查" in menu:
             a_cnt = sum(1 for r in sl if r["_seu"]=="A")
             icon = SYSTEM_ICONS.get(sn,"🔧")
             card_cols[i].markdown(f"""
-<div style='background:#fff;border-radius:10px;padding:12px;
-            box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;
-            border-top:3px solid #2563a8;'>
-  <div style='font-size:24px'>{icon}</div>
-  <div style='font-size:13px;font-weight:700;color:#1a3a5c'>{sn}</div>
-  <div style='font-size:22px;font-weight:800;color:#2563a8'>{len(sl)}</div>
-  <div style='font-size:11px;color:#64748b'>台設備</div>
-  <div style='font-size:11px;color:#f59e0b;font-weight:600'>A級：{a_cnt} 台</div>
-  <div style='font-size:10px;color:#94a3b8'>{sum(r["_kwh"] for r in sl):,.0f} kWh/年</div>
+<div style='background:#fff;border-radius:12px;padding:18px 10px;
+            box-shadow:0 1px 6px rgba(0,0,0,.10);text-align:center;
+            border-top:4px solid #2563a8;'>
+  <div style='font-size:32px;margin-bottom:6px'>{icon}</div>
+  <div style='font-size:16px;font-weight:700;color:#1a3a5c;margin-bottom:6px'>{sn}</div>
+  <div style='font-size:32px;font-weight:800;color:#2563a8;line-height:1'>{len(sl)}</div>
+  <div style='font-size:14px;color:#64748b;margin-bottom:6px'>台設備</div>
+  <div style='font-size:14px;color:#f59e0b;font-weight:700'>A級：{a_cnt} 台</div>
+  <div style='font-size:13px;color:#94a3b8;margin-top:4px'>{sum(r["_kwh"] for r in sl):,.0f} kWh/年</div>
 </div>""", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
