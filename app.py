@@ -754,14 +754,7 @@ elif "設備盤查" in menu:
                 st.download_button(f"⬇️ 匯出 {sn} CSV", csv_data,
                     f"SEU_{sn}_{datetime.now().strftime('%Y%m%d')}.csv","text/csv",key=f"dl_{sn}")
 
-    if False:  # placeholder to keep old filtered variable in scope
-        filtered = []
-    with fc1:
-        kw_f  = st.text_input("🔍 搜尋設備名稱 / 編號 / 部門")
-    with fc2:
-        sys_f = st.selectbox("系統篩選", ["全部"] + list(SYSTEM_SHEETS.keys()))
-    with fc3:
-        seu_f = st.selectbox("重大性篩選", ["全部", "A 級重大設備", "一般設備"])
+
 
 
 
