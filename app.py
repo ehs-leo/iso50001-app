@@ -258,8 +258,20 @@ if "db" not in st.session_state:
 
 def all_calc():
     rows = []
+    seen_keys = set()
     for rec in st.session_state["db"]:
         r = dict(rec)
+        # 去除完全相同的重複記錄（相同系統+名稱+編號+棟別+樓層+部門+負載率+時數）
+        dedup_key = (
+            str(r.get("系統別","")), str(r.get("設備名稱","")),
+            str(r.get("設備編號","")), str(r.get("所在棟別","")),
+            str(r.get("所在樓層","")), str(r.get("設備部門","")),
+            str(r.get("負載率","")), str(r.get("運轉時數(hr/年)","")),
+            str(r.get("消耗功率(kW)",""))
+        )
+        if dedup_key in seen_keys:
+            continue
+        seen_keys.add(dedup_key)
         kwh, sc, seu = calc_row(r)
         r.update({"_kwh": kwh, "_sc": sc, "_seu": seu})
         rows.append(r)
