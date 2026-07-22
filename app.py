@@ -14,34 +14,6 @@ from PIL import Image
 from datetime import datetime
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helper: 置中表格
-# ─────────────────────────────────────────────────────────────────────────────
-def centered_table(df):
-    """將 DataFrame 轉為文字置中的 HTML 表格"""
-    styles = """
-    <style>
-    .ctable { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:8px; }
-    .ctable th {
-        background:#1a3a5c; color:#fff; padding:9px 12px;
-        text-align:center; font-weight:600; border:1px solid #334155;
-    }
-    .ctable td {
-        padding:8px 12px; text-align:center;
-        border:1px solid #e2e8f0; color:#1e293b;
-    }
-    .ctable tr:nth-child(even) td { background:#f8fafc; }
-    .ctable tr:hover td { background:#eff6ff; }
-    </style>
-    """
-    rows_html = ""
-    for _, row in df.iterrows():
-        cells = "".join(f"<td>{v}</td>" for v in row.values)
-        rows_html += f"<tr>{cells}</tr>"
-    headers = "".join(f"<th>{col}</th>" for col in df.columns)
-    html = f"""{styles}<table class="ctable"><thead><tr>{headers}</tr></thead><tbody>{rows_html}</tbody></table>"""
-    st.markdown(html, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────────────────────────────────────
 # 0. 頁面設定
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -75,16 +47,6 @@ st.markdown("""
     background:#eff6ff; border-left:5px solid #2563a8;
     padding:12px 16px; border-radius:6px; color:#1e40af; font-size:14px;
   }
-  /* 表格文字置中 */
-  [data-testid="stDataFrame"] td,
-  [data-testid="stDataFrame"] th {
-    text-align: center !important;
-    justify-content: center !important;
-  }
-  [data-testid="stDataFrame"] [data-testid="glideDataEditor"] .dvn-stack {
-    justify-content: center !important;
-  }
-  .dvn-stack span { text-align: center !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -258,20 +220,8 @@ if "db" not in st.session_state:
 
 def all_calc():
     rows = []
-    seen_keys = set()
     for rec in st.session_state["db"]:
         r = dict(rec)
-        # 去除完全相同的重複記錄（相同系統+名稱+編號+棟別+樓層+部門+負載率+時數）
-        dedup_key = (
-            str(r.get("系統別","")), str(r.get("設備名稱","")),
-            str(r.get("設備編號","")), str(r.get("所在棟別","")),
-            str(r.get("所在樓層","")), str(r.get("設備部門","")),
-            str(r.get("負載率","")), str(r.get("運轉時數(hr/年)","")),
-            str(r.get("消耗功率(kW)",""))
-        )
-        if dedup_key in seen_keys:
-            continue
-        seen_keys.add(dedup_key)
         kwh, sc, seu = calc_row(r)
         r.update({"_kwh": kwh, "_sc": sc, "_seu": seu})
         rows.append(r)
@@ -325,7 +275,6 @@ with st.sidebar:
         "全廠能耗儀表板",
         "設備盤查與照片管理",
         "評分標準說明",
-        "能源換算與排放數據",
         "每日負載分析",
         "從Excel重新載入",
     ], label_visibility="collapsed")
@@ -368,82 +317,6 @@ if not os.path.exists(EXCEL_FILE) and len(st.session_state["db"]) == 0:
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 頁面一：全廠能耗儀表板
 # ─────────────────────────────────────────────────────────────────────────────
-def _render_equipment_detail(r, db_idx, loop_idx):
-    d1, d2, d3, d4 = st.columns(4)
-    d1.metric("消耗功率",   f"{r.get('消耗功率(kW)','')} kW")
-    d2.metric("年運轉時數", f"{float(r.get('運轉時數(hr/年)') or 0):,.0f} hr")
-    d3.metric("使用年數",   f"{int(r.get('使用年數') or 0)} 年")
-    d4.metric("重大性評分", r["_sc"])
-    col_info, col_photo = st.columns([1, 1])
-    with col_info:
-        load_pct = f"{float(r.get('負載率',0))*100:.0f}%" if r.get('負載率') else "—"
-        st.markdown(f"""
-| 欄位 | 資料 |
-|------|------|
-| 部門 | {r.get('設備部門','—')} |
-| 棟別/樓層 | {r.get('所在棟別','—')} / {r.get('所在樓層','—')} |
-| 型式說明 | {r.get('設備型式','—')} |
-| 數量 | {r.get('設備數量','—')} 台 |
-| 負載率 | {load_pct} |
-| 設備年份 | {r.get('設備年份','—')} |
-| 管理者 | {r.get('設備管理者','—')} |
-| 外包商 | {r.get('外包商承攬商','—')} |
-| **年耗電量** | **{r['_kwh']:,.0f} kWh** |
-| **SEU 鑑別** | **{'⭐ A 級' if r["_seu"]=='A' else '一般設備'}** |
-""")
-    with col_photo:
-        st.markdown("**📷 設備影像**")
-        ph1, ph2 = st.columns(2)
-        with ph1:
-            st.caption("外觀照片")
-            if r.get("外觀照片"):
-                try: st.image(Image.open(BytesIO(base64.b64decode(r["外觀照片"]))), use_container_width=True)
-                except: st.warning("照片解碼失敗")
-            else: st.info("未上傳")
-        with ph2:
-            st.caption("銘牌照片")
-            if r.get("銘牌照片"):
-                try: st.image(Image.open(BytesIO(base64.b64decode(r["銘牌照片"]))), use_container_width=True)
-                except: st.warning("照片解碼失敗")
-            else: st.info("未上傳")
-    if st.session_state["edit_mode"] and db_idx is not None:
-        st.markdown("---")
-        cur = st.session_state["db"][db_idx]
-        with st.form(f"ef_{loop_idx}_{db_idx}"):
-            e1, e2, e3 = st.columns(3)
-            with e1:
-                e_name = st.text_input("設備名稱", value=str(cur.get("設備名稱","") or ""))
-                e_id   = st.text_input("設備編號", value=str(cur.get("設備編號","") or ""))
-                e_dept = st.text_input("部門",     value=str(cur.get("設備部門","") or ""))
-            with e2:
-                e_kw   = st.number_input("消耗功率(kW)", value=float(cur.get("消耗功率(kW)") or 0), min_value=0.0, step=0.1)
-                e_qty  = st.number_input("設備數量", value=int(cur.get("設備數量") or 1), min_value=1)
-                e_load = st.slider("負載率", 0.1, 1.0, float(cur.get("負載率") or 0.8), 0.05)
-            with e3:
-                e_hrs  = st.number_input("年運轉時數", value=float(cur.get("運轉時數(hr/年)") or 0), min_value=0.0)
-                e_crit = st.slider("自評重大性", 1, 5, int(cur.get("自評重大性") or 3))
-                e_mgr  = st.text_input("設備管理者", value=str(cur.get("設備管理者","") or ""))
-            up1 = st.file_uploader("更新外觀照片", type=["jpg","jpeg","png"], key=f"u1_{loop_idx}_{db_idx}")
-            up2 = st.file_uploader("更新銘牌照片", type=["jpg","jpeg","png"], key=f"u2_{loop_idx}_{db_idx}")
-            sv, dl = st.columns([3,1])
-            with sv: save_ok = st.form_submit_button("💾 儲存變更", use_container_width=True)
-            with dl: del_ok  = st.form_submit_button("🗑️ 刪除", use_container_width=True)
-            if save_ok:
-                st.session_state["db"][db_idx].update({
-                    "設備名稱":e_name,"設備編號":e_id,"設備部門":e_dept,
-                    "消耗功率(kW)":e_kw,"設備數量":e_qty,"負載率":e_load,
-                    "運轉時數(hr/年)":e_hrs,"自評重大性":e_crit,"設備管理者":e_mgr,
-                })
-                if up1: st.session_state["db"][db_idx]["外觀照片"] = base64.b64encode(up1.read()).decode()
-                if up2: st.session_state["db"][db_idx]["銘牌照片"] = base64.b64encode(up2.read()).decode()
-                save_json(st.session_state["db"])
-                st.success("✅ 已儲存！"); st.rerun()
-            if del_ok:
-                st.session_state["db"].pop(db_idx)
-                save_json(st.session_state["db"])
-                st.warning("已刪除。"); st.rerun()
-
-
 if "儀表板" in menu:
     rows = all_calc()
 
@@ -520,17 +393,17 @@ if "儀表板" in menu:
                 hovertemplate="<b>%{label}</b><br>%{value:,.0f} kWh<br>%{percent}<extra></extra>"
             )
             fig_pie.update_layout(
+                title=dict(text="各系統能耗佔比", x=0.5, font=dict(size=15)),
                 legend=dict(
-                    orientation="h",
-                    yanchor="top", y=-0.05,
-                    xanchor="center", x=0.5,
-                    font=dict(size=12)
+                    orientation="v",
+                    yanchor="middle", y=0.5,
+                    xanchor="left", x=1.02,
+                    font=dict(size=13)
                 ),
-                margin=dict(t=20, b=60, l=20, r=20),
-                height=400,
+                margin=dict(t=50, b=20, l=20, r=120),
+                height=380,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
-            st.markdown("<p style='text-align:center;font-size:16px;font-weight:700;color:#1a3a5c;'>全廠區用電數據</p>", unsafe_allow_html=True)
         else:
             st.info("無耗電量資料，無法顯示圓餅圖。")
 
@@ -562,7 +435,7 @@ if "儀表板" in menu:
         df_show = df_sys.copy()
         df_show["耗電量(kWh/年)"] = df_show["耗電量(kWh/年)"].apply(lambda v: f"{v:,.0f}")
         df_show["佔比(%)"]        = df_show["佔比(%)"].apply(lambda v: f"{v:.1f}%")
-        centered_table(df_show)
+        st.dataframe(df_show, hide_index=True, use_container_width=True)
 
     # A 級設備清單
     a_rows = sorted([r for r in rows if r["_seu"] == "A"],
@@ -570,7 +443,7 @@ if "儀表板" in menu:
     if a_rows:
         st.divider()
         st.subheader("⭐ A 級重大耗能設備（依耗電量排序）")
-        centered_table(pd.DataFrame([{
+        st.dataframe(pd.DataFrame([{
             "系統":         r.get("系統別", ""),
             "設備名稱":     r.get("設備名稱", ""),
             "編號":         r.get("設備編號", ""),
@@ -579,77 +452,7 @@ if "儀表板" in menu:
             "年耗電(kWh)": f"{r['_kwh']:,.0f}",
             "重大性評分":  r["_sc"],
             "管理者":       r.get("設備管理者", ""),
-        } for r in a_rows]))
-
-    # ── 各項能源耗能占比
-    st.divider()
-    st.subheader("🔥 各項能源耗能占比")
-
-    # 能源數據（來自 Excel 表2 各項能源耗能占比）
-    ENERGY_DATA = {
-        "汽油":   {"kwh_per_m2": 9339.49023,  "pct": 0.48},
-        "柴油":   {"kwh_per_m2": 20090.1181,  "pct": 1.04},
-        "外購電力": {"kwh_per_m2": 1911641,    "pct": 98.48},
-    }
-    TOTAL_ENERGY_KWH = 1941070.608  # 全廠實際耗能量 kWh/公秉
-
-    df_energy = pd.DataFrame([
-        {
-            "能源來源":           name,
-            "能耗評估(kWh/公秉)": v["kwh_per_m2"],
-            "耗能占比(%)":        v["pct"],
-        }
-        for name, v in ENERGY_DATA.items()
-    ])
-
-    e_col1, e_col2 = st.columns([1, 1])
-
-    with e_col1:
-        fig_energy = go.Figure(go.Pie(
-            labels=list(ENERGY_DATA.keys()),
-            values=[v["pct"] for v in ENERGY_DATA.values()],
-            hole=0.40,
-            marker_colors=["#3b82f6", "#ef4444", "#22c55e"],
-            textinfo="percent",
-            textposition="inside",
-            insidetextorientation="radial",
-            hovertemplate="<b>%{label}</b><br>占比：%{value:.2f}%<extra></extra>",
-        ))
-        fig_energy.update_layout(
-            legend=dict(
-                orientation="h",
-                yanchor="top", y=-0.05,
-                xanchor="center", x=0.5,
-                font=dict(size=13)
-            ),
-            margin=dict(t=20, b=60, l=20, r=20),
-            height=400,
-        )
-        st.plotly_chart(fig_energy, use_container_width=True)
-        st.markdown("<p style='text-align:center;font-size:16px;font-weight:700;color:#1a3a5c;'>各項能源耗能占比</p>", unsafe_allow_html=True)
-
-    with e_col2:
-        st.markdown("##### 各項能源耗能數據")
-        st.markdown(f"""
-| 能源來源 | 能耗評估 (kWh/公秉) | 耗能占比 |
-|---------|-------------------|---------|
-| 汽油 | 9,339.49 | 0.48% |
-| 柴油 | 20,090.12 | 1.04% |
-| 外購電力 | 1,911,641 | 98.48% |
-""")
-        st.markdown(f"""
-        <div style='background:#f0fdf4;border-left:4px solid #22c55e;
-                    padding:14px 16px;border-radius:6px;margin-top:12px'>
-          <div style='font-size:12px;color:#64748b;margin-bottom:4px'>全廠實際總耗能量</div>
-          <div style='font-size:26px;font-weight:800;color:#166534'>
-            1,941,070.608 <span style='font-size:14px;font-weight:400'>kWh/公秉</span>
-          </div>
-          <div style='font-size:12px;color:#64748b;margin-top:8px'>
-            外購電力占全廠能源 <strong style='color:#166534'>98.48%</strong>，
-            為最主要能源來源
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        } for r in a_rows]), hide_index=True, use_container_width=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 頁面二：設備盤查與照片管理
@@ -698,79 +501,174 @@ elif "設備盤查" in menu:
                         st.success(f"✅ 設備【{in_name}】已寫入！")
                         st.rerun()
 
-    # ── 搜尋 + 重大性篩選
-    kw_f  = st.text_input("🔍 搜尋設備名稱 / 編號 / 部門（跨系統搜尋）")
-    seu_f = st.selectbox("重大性篩選", ["全部", "A 級重大設備", "一般設備"])
-    rows  = all_calc()
+    # 篩選列
+    fc1, fc2, fc3 = st.columns([2, 1, 1])
+    with fc1:
+        kw_f  = st.text_input("🔍 搜尋設備名稱 / 編號 / 部門")
+    with fc2:
+        sys_f = st.selectbox("系統篩選", ["全部"] + list(SYSTEM_SHEETS.keys()))
+    with fc3:
+        seu_f = st.selectbox("重大性篩選", ["全部", "A 級重大設備", "一般設備"])
 
-    def get_db_idx(r):
-        return next((i for i,d in enumerate(st.session_state["db"])
-                     if str(d.get("設備名稱",""))==str(r.get("設備名稱",""))
-                     and str(d.get("設備編號",""))==str(r.get("設備編號",""))
-                     and str(d.get("系統別",""))  ==str(r.get("系統別",""))), None)
+    rows     = all_calc()
+    filtered = []
+    for r in rows:
+        if sys_f != "全部" and r.get("系統別") != sys_f:
+            continue
+        if seu_f == "A 級重大設備" and r["_seu"] != "A":
+            continue
+        if seu_f == "一般設備" and r["_seu"] == "A":
+            continue
+        if kw_f:
+            s = f"{r.get('設備名稱','')} {r.get('設備編號','')} {r.get('設備部門','')}".lower()
+            if kw_f.lower() not in s:
+                continue
+        filtered.append(r)
 
-    if kw_f:
-        # ── 搜尋模式
-        filtered = [r for r in rows
-                    if (seu_f=="全部" or (seu_f=="A 級重大設備" and r["_seu"]=="A") or (seu_f=="一般設備" and r["_seu"]!="-"))
-                    and kw_f.lower() in f"{r.get('設備名稱','')} {r.get('設備編號','')} {r.get('設備部門','')}".lower()]
-        st.caption(f"搜尋結果：**{len(filtered)}** 筆")
-        for li, r in enumerate(filtered):
-            icon  = SYSTEM_ICONS.get(r.get("系統別",""), "🔧")
-            a_tag = " ⭐A級" if r["_seu"]=="A" else ""
-            title = f"{icon}[{r.get('系統別','')}] {r.get('設備名稱','')} ({r.get('設備編號','')})  ｜  {r['_kwh']:,.0f} kWh  評分{r['_sc']}{a_tag}"
-            with st.expander(title, expanded=False):
-                _render_equipment_detail(r, get_db_idx(r), li)
-    else:
-        # ── 系統分頁模式
-        sys_rows = {}
-        for r in rows:
-            if seu_f=="A 級重大設備" and r["_seu"]!="A": continue
-            if seu_f=="一般設備" and r["_seu"]=="A": continue
-            s = r.get("系統別","其他")
-            sys_rows.setdefault(s,[]).append(r)
+    st.caption(f"顯示 **{len(filtered)}** 筆（共 {len(rows)} 筆）")
 
-        # 摘要卡片
-        card_cols = st.columns(len(sys_rows))
-        for i,(sn,sl) in enumerate(sys_rows.items()):
-            a_cnt = sum(1 for r in sl if r["_seu"]=="A")
-            icon = SYSTEM_ICONS.get(sn,"🔧")
-            card_cols[i].markdown(f"""
-<div style='background:#fff;border-radius:12px;padding:18px 10px;
-            box-shadow:0 1px 6px rgba(0,0,0,.10);text-align:center;
-            border-top:4px solid #2563a8;'>
-  <div style='font-size:32px;margin-bottom:6px'>{icon}</div>
-  <div style='font-size:16px;font-weight:700;color:#1a3a5c;margin-bottom:6px'>{sn}</div>
-  <div style='font-size:32px;font-weight:800;color:#2563a8;line-height:1'>{len(sl)}</div>
-  <div style='font-size:14px;color:#64748b;margin-bottom:6px'>台設備</div>
-  <div style='font-size:14px;color:#f59e0b;font-weight:700'>A級：{a_cnt} 台</div>
-  <div style='font-size:13px;color:#94a3b8;margin-top:4px'>{sum(r["_kwh"] for r in sl):,.0f} kWh/年</div>
-</div>""", unsafe_allow_html=True)
+    for loop_idx, r in enumerate(filtered):
+        db_idx = next(
+            (i for i, d in enumerate(st.session_state["db"])
+             if str(d.get("設備名稱","")) == str(r.get("設備名稱",""))
+             and str(d.get("設備編號","")) == str(r.get("設備編號",""))
+             and str(d.get("系統別",""))   == str(r.get("系統別",""))),
+            None
+        )
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        icon  = SYSTEM_ICONS.get(r.get("系統別",""), "🔧")
+        a_tag = " ⭐A級" if r["_seu"] == "A" else ""
+        title = (f"{icon} [{r.get('系統別','')}]  "
+                 f"{r.get('設備名稱','')} ({r.get('設備編號','')})"
+                 f"  ｜  {r['_kwh']:,.0f} kWh/年"
+                 f"  評分 {r['_sc']}{a_tag}")
 
-        # 系統 Tabs
-        tab_names = [f"{SYSTEM_ICONS.get(s,'🔧')} {s}（{len(v)}台）" for s,v in sys_rows.items()]
-        tabs = st.tabs(tab_names)
-        for tab,(sn,sl) in zip(tabs,sys_rows.items()):
-            with tab:
-                a_list = [r for r in sl if r["_seu"]=="A"]
-                st.caption(f"共 **{len(sl)}** 台 ｜ A級 **{len(a_list)}** 台 ｜ 年耗電 **{sum(r['_kwh'] for r in sl):,.0f}** kWh")
-                for li,r in enumerate(sl):
-                    a_tag = " ⭐A級" if r["_seu"]=="A" else ""
-                    title = f"{r.get('設備名稱','')} ({r.get('設備編號','')})  ｜  {r['_kwh']:,.0f} kWh/年  評分{r['_sc']}{a_tag}"
-                    with st.expander(title, expanded=False):
-                        _render_equipment_detail(r, get_db_idx(r), li)
-                st.divider()
-                csv_data = pd.DataFrame([{k:v for k,v in r.items() if k not in ("外觀照片","銘牌照片","_kwh","_sc","_seu")} for r in sl]).to_csv(index=False).encode("utf-8-sig")
-                st.download_button(f"⬇️ 匯出 {sn} CSV", csv_data,
-                    f"SEU_{sn}_{datetime.now().strftime('%Y%m%d')}.csv","text/csv",key=f"dl_{sn}")
+        with st.expander(title, expanded=False):
+            d1, d2, d3, d4 = st.columns(4)
+            d1.metric("消耗功率",   f"{r.get('消耗功率(kW)','')} kW")
+            d2.metric("年運轉時數", f"{float(r.get('運轉時數(hr/年)') or 0):,.0f} hr")
+            d3.metric("使用年數",   f"{int(r.get('使用年數') or 0)} 年")
+            d4.metric("重大性評分", r["_sc"])
 
+            col_info, col_photo = st.columns([1, 1])
+            with col_info:
+                load_pct = f"{float(r.get('負載率',0))*100:.0f}%" if r.get('負載率') else "—"
+                st.markdown(f"""
+| 欄位 | 資料 |
+|------|------|
+| 部門 | {r.get('設備部門','—')} |
+| 棟別/樓層 | {r.get('所在棟別','—')} / {r.get('所在樓層','—')} |
+| 型式說明 | {r.get('設備型式','—')} |
+| 數量 | {r.get('設備數量','—')} 台 |
+| 負載率 | {load_pct} |
+| 設備年份 | {r.get('設備年份','—')} |
+| 管理者 | {r.get('設備管理者','—')} |
+| 外包商 | {r.get('外包商承攬商','—')} |
+| 相關變數 | {r.get('相關變數','—')} |
+| **年耗電量** | **{r['_kwh']:,.0f} kWh** |
+| **SEU 鑑別** | **{'⭐ A 級重大設備' if r['_seu']=='A' else '一般設備'}** |
+""")
+            with col_photo:
+                st.markdown("**📷 設備影像**")
+                ph1, ph2 = st.columns(2)
+                with ph1:
+                    st.caption("外觀照片")
+                    if r.get("外觀照片"):
+                        try:
+                            st.image(Image.open(BytesIO(base64.b64decode(r["外觀照片"]))),
+                                     use_container_width=True)
+                        except:
+                            st.warning("照片解碼失敗")
+                    else:
+                        st.info("未上傳")
+                with ph2:
+                    st.caption("銘牌照片")
+                    if r.get("銘牌照片"):
+                        try:
+                            st.image(Image.open(BytesIO(base64.b64decode(r["銘牌照片"]))),
+                                     use_container_width=True)
+                        except:
+                            st.warning("照片解碼失敗")
+                    else:
+                        st.info("未上傳")
 
+            # 行內編輯（修改模式）
+            if st.session_state["edit_mode"] and db_idx is not None:
+                st.markdown("---")
+                st.markdown("**✏️ 編輯此設備數據**")
+                cur = st.session_state["db"][db_idx]
+                with st.form(f"ef_{loop_idx}_{db_idx}"):
+                    e1, e2, e3 = st.columns(3)
+                    with e1:
+                        e_name = st.text_input("設備名稱", value=str(cur.get("設備名稱","") or ""))
+                        e_id   = st.text_input("設備編號", value=str(cur.get("設備編號","") or ""))
+                        e_dept = st.text_input("部門",     value=str(cur.get("設備部門","") or ""))
+                    with e2:
+                        e_kw   = st.number_input("消耗功率(kW)",
+                                    value=float(cur.get("消耗功率(kW)") or 0),
+                                    min_value=0.0, step=0.1)
+                        e_qty  = st.number_input("設備數量",
+                                    value=int(cur.get("設備數量") or 1),
+                                    min_value=1)
+                        e_load = st.slider("負載率", 0.1, 1.0,
+                                    float(cur.get("負載率") or 0.8), 0.05)
+                    with e3:
+                        e_hrs  = st.number_input("年運轉時數",
+                                    value=float(cur.get("運轉時數(hr/年)") or 0),
+                                    min_value=0.0)
+                        e_crit = st.slider("自評重大性(1~5)", 1, 5,
+                                    int(cur.get("自評重大性") or 3))
+                        e_mgr  = st.text_input("設備管理者",
+                                    value=str(cur.get("設備管理者","") or ""))
 
+                    up1 = st.file_uploader("更新外觀照片（留空保留原圖）",
+                                type=["jpg","jpeg","png"], key=f"u1_{loop_idx}_{db_idx}")
+                    up2 = st.file_uploader("更新銘牌照片（留空保留原圖）",
+                                type=["jpg","jpeg","png"], key=f"u2_{loop_idx}_{db_idx}")
 
+                    sv, dl = st.columns([3, 1])
+                    with sv:
+                        save_ok = st.form_submit_button("💾 儲存變更", use_container_width=True)
+                    with dl:
+                        del_ok  = st.form_submit_button("🗑️ 刪除設備", use_container_width=True)
 
+                    if save_ok:
+                        st.session_state["db"][db_idx].update({
+                            "設備名稱": e_name, "設備編號": e_id, "設備部門": e_dept,
+                            "消耗功率(kW)": e_kw, "設備數量": e_qty, "負載率": e_load,
+                            "運轉時數(hr/年)": e_hrs, "自評重大性": e_crit,
+                            "設備管理者": e_mgr,
+                        })
+                        if up1:
+                            st.session_state["db"][db_idx]["外觀照片"] = \
+                                base64.b64encode(up1.read()).decode()
+                        if up2:
+                            st.session_state["db"][db_idx]["銘牌照片"] = \
+                                base64.b64encode(up2.read()).decode()
+                        save_json(st.session_state["db"])
+                        st.success("✅ 已儲存！")
+                        st.rerun()
 
+                    if del_ok:
+                        st.session_state["db"].pop(db_idx)
+                        save_json(st.session_state["db"])
+                        st.warning("已刪除。")
+                        st.rerun()
+
+    # 匯出 CSV
+    st.divider()
+    if filtered:
+        exp_data = [
+            {k: v for k, v in r.items()
+             if k not in ("外觀照片","銘牌照片","_kwh","_sc","_seu")}
+            for r in filtered
+        ]
+        csv = pd.DataFrame(exp_data).to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "⬇️ 匯出篩選結果 CSV", csv,
+            f"SEU_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            "text/csv"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -787,7 +685,7 @@ elif "評分標準" in menu:
             "鑑別因子": ["設備耗能估比", "工廠自評重大性（設備管控評估）", "總計"],
             "估比":     ["50%", "50%", "100%"],
         })
-        centered_table(df_w1)
+        st.dataframe(df_w1, hide_index=True, use_container_width=False)
 
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2 = st.columns(2)
@@ -798,7 +696,7 @@ elif "評分標準" in menu:
                 "耗能估比範圍": ["— ～ 0.24%", "0.25% ～ 0.49%", "0.50% ～ 0.74%", "0.75% ～", "1.00% ～"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            centered_table(df_s1)
+            st.dataframe(df_s1, hide_index=True, use_container_width=True)
 
         with col2:
             st.markdown("##### 工廠自評重大性評分")
@@ -807,7 +705,7 @@ elif "評分標準" in menu:
                 "說明": ["非重要管控項目", "", "需再評估", "", "既有或應該列入管控"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            centered_table(df_s2)
+            st.dataframe(df_s2, hide_index=True, use_container_width=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 重大能源使用鑑別級距")
@@ -816,7 +714,7 @@ elif "評分標準" in menu:
             "級別": ["-", "-", "-", "A"],
             "說明": ["一般設備", "一般設備", "一般設備", "重大能源使用設備（SEU）"],
         })
-        centered_table(df_seu)
+        st.dataframe(df_seu, hide_index=True, use_container_width=True)
 
         st.info("**計算公式：** 重大性評分 = 設備耗能估比分數 × 50% ＋ 工廠自評重大性分數 × 50%\n\n評分 ≥ 4.0 分 → 鑑別為 **A 級重大能源使用設備（SEU）**，需研提能源管理行動計畫並制訂操作規範。\n\n> 📝 備註：管控可為 SOP 或即時監控")
 
@@ -826,7 +724,7 @@ elif "評分標準" in menu:
             "鑑別因子":     ["設備耗能估比", "設備老舊度", "設備運轉度", "能效改善頻率", "改善執行難易度", "總計"],
             "估比":         ["15%", "30%", "5%", "20%", "30%", "100%"],
         })
-        centered_table(df_w2)
+        st.dataframe(df_w2, hide_index=True, use_container_width=False)
 
         st.markdown("<br>", unsafe_allow_html=True)
         col3, col4 = st.columns(2)
@@ -837,21 +735,21 @@ elif "評分標準" in menu:
                 "耗能估比範圍": ["0% ～ 0.1%", "0.1% ～ 0.1%", "0.1% ～ 0.4%", "0.5% ～ 1.0%", "1.0% ～"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            centered_table(df_p1)
+            st.dataframe(df_p1, hide_index=True, use_container_width=True)
 
             st.markdown("##### 設備老舊度評分")
             df_p2 = pd.DataFrame({
                 "使用年數": ["0 ～ 4 年", "5 ～ 9 年", "10 ～ 14 年", "15 ～ 19 年", "20 年以上"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            centered_table(df_p2)
+            st.dataframe(df_p2, hide_index=True, use_container_width=True)
 
             st.markdown("##### 設備運轉度評分")
             df_p3 = pd.DataFrame({
                 "年運轉時數": ["0 ～ 1,460 小時", "1,461 ～ 2,920 小時", "2,921 ～ 4,380 小時", "4,381 ～ 5,840 小時", "5,841 ～ 8,760 小時"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            centered_table(df_p3)
+            st.dataframe(df_p3, hide_index=True, use_container_width=True)
 
         with col4:
             st.markdown("##### 能效改善頻率評分")
@@ -859,14 +757,14 @@ elif "評分標準" in menu:
                 "改善頻率": ["# ～ 1（5年內新機）", "2 ～ 2", "3 ～ 3（10年以上能效改善1次）", "4 ～ 4", "5 ～ 5（10年以上從未改善）"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            centered_table(df_p4)
+            st.dataframe(df_p4, hide_index=True, use_container_width=True)
 
             st.markdown("##### 改善執行難易度評分")
             df_p5 = pd.DataFrame({
                 "難易度": ["# ～ 1（不會改善）", "2 ～ 2", "3 ～ 3（需再評估）", "4 ～ 4", "5 ～ 5（可立即改善）"],
                 "分數": [1, 2, 3, 4, 5],
             })
-            centered_table(df_p5)
+            st.dataframe(df_p5, hide_index=True, use_container_width=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 優先改善項目鑑別級距")
@@ -875,189 +773,9 @@ elif "評分標準" in menu:
             "級別": ["-", "-", "-", "I"],
             "說明": ["一般設備", "一般設備", "一般設備", "優先改善項目"],
         })
-        centered_table(df_pri)
+        st.dataframe(df_pri, hide_index=True, use_container_width=True)
 
         st.info("**計算公式：** 優先改善評分 = 耗能估比分數 × 15% ＋ 老舊度分數 × 30% ＋ 運轉度分數 × 5% ＋ 改善頻率分數 × 20% ＋ 改善難易度分數 × 30%\n\n評分 ≥ 4.0 分 → 鑑別為 **I 級優先改善項目**，需優先執行能效改善作業。")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ── 頁面：能源換算與排放數據
-# ─────────────────────────────────────────────────────────────────────────────
-elif "能源換算" in menu:
-    st.subheader("⚡ 能源換算與溫室氣體排放數據")
-
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "熱值表", "換算表（能源使用）", "油當量表", "溫室氣體排放數據"
-    ])
-
-    # ── Tab 1：熱值表
-    with tab1:
-        st.markdown("#### 各能源熱值表")
-        st.caption("資料來源：113年能源統計手冊－能源產品單位熱值表")
-        df_heat = pd.DataFrame([
-            {"能源種類": "燃料油",        "熱值": 9320,  "單位": "kcal/L"},
-            {"能源種類": "車用汽油",       "熱值": 7520,  "單位": "kcal/L"},
-            {"能源種類": "柴油",          "熱值": 8629,  "單位": "kcal/L"},
-            {"能源種類": "液化石油氣(LPG)","熱值": 5958,  "單位": "kcal/L"},
-            {"能源種類": "天然氣(NG)",    "熱值": 5925,  "單位": "kcal/m³"},
-            {"能源種類": "外購電力",       "熱值": 860,   "單位": "kcal/kWh"},
-            {"能源種類": "燃料煤",        "熱值": 5890,  "單位": "kcal/kg"},
-        ])
-        centered_table(df_heat)
-
-        st.markdown("#### 換算說明")
-        st.info("""
-- 液化石油氣：1 公斤＝1.818 公升（一般）
-- 液化天然氣：1 公斤（液態）≒1.320 立方公尺（氣態）≒2.207 公升（液態）
-- 丙烷混合氣：1 公斤＝1.095 立方公尺＝1.786 公升
-- 1 公斤油當量 = 10,000 千卡
-- 1 kWh = 3,600 kJ（千焦耳）
-- 1 kcal = 4.184 kJ
-- 1 kWh = 3,600 kJ = 3,600/4.184 kcal = 860.4 kcal
-- 1 Mcal = 1,000 kcal = 860.4 kcal/kWh = 1.1628 kWh
-        """)
-
-    # ── Tab 2：換算表（能源使用）
-    with tab2:
-        st.markdown("#### 各項能源使用換算表")
-        df_conv = pd.DataFrame([
-            {
-                "能源種類": "燃料油", "使用量": "-", "單位": "公秉",
-                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
-                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "-"
-            },
-            {
-                "能源種類": "汽油", "使用量": "1.0681", "單位": "公秉",
-                "用電量(kWh/公秉)": "9,339.490", "熱值(Mcal/L)": "8,031.962",
-                "油當量值(kLOE/公秉)": "0.80", "溫室氣體排放量(公噸CO₂e/公秉)": "2.4650"
-            },
-            {
-                "能源種類": "柴油", "使用量": "2.0023", "單位": "公秉",
-                "用電量(kWh/公秉)": "20,090.118", "熱值(Mcal/L)": "17,277.502",
-                "油當量值(kLOE/公秉)": "1.73", "溫室氣體排放量(公噸CO₂e/公秉)": "6.2700"
-            },
-            {
-                "能源種類": "液化石油氣(LPG)", "使用量": "-", "單位": "公秉",
-                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
-                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "0.0000"
-            },
-            {
-                "能源種類": "天然氣(NG)", "使用量": "-", "單位": "千立方公尺",
-                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
-                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "0.0000"
-            },
-            {
-                "能源種類": "外購電力", "使用量": "1,911.6410", "單位": "千度",
-                "用電量(kWh/公秉)": "1,911,641.00", "熱值(Mcal/L)": "1,644,011.26",
-                "油當量值(kLOE/公秉)": "164.40", "溫室氣體排放量(公噸CO₂e/公秉)": "906.1178"
-            },
-            {
-                "能源種類": "燃料煤", "使用量": "-", "單位": "公噸",
-                "用電量(kWh/公秉)": "-", "熱值(Mcal/L)": "-",
-                "油當量值(kLOE/公秉)": "-", "溫室氣體排放量(公噸CO₂e/公秉)": "0.0000"
-            },
-        ])
-        centered_table(df_conv)
-
-        # 摘要 KPI
-        st.markdown("<br>", unsafe_allow_html=True)
-        c1, c2, c3 = st.columns(3)
-        c1.metric("外購電力用電量", "1,911,641 kWh", "千度")
-        c2.metric("總油當量", "164.40 kLOE", "外購電力")
-        c3.metric("總CO₂排放量", "906.12 公噸CO₂e", "外購電力貢獻")
-
-    # ── Tab 3：油當量表
-    with tab3:
-        st.markdown("#### 各能源油當量換算表")
-        st.caption("資料來源：113年能源統計手冊－能源產品單位熱值表")
-        df_oe = pd.DataFrame([
-            {"能源種類": "燃料油",         "油當量值": 0.9320, "單位": "kLOE/公秉"},
-            {"能源種類": "汽油",           "油當量值": 0.7520, "單位": "kLOE/公秉"},
-            {"能源種類": "柴油",           "油當量值": 0.8629, "單位": "kLOE/公秉"},
-            {"能源種類": "液化石油氣(LPG)", "油當量值": 0.5958, "單位": "kLOE/公秉"},
-            {"能源種類": "天然氣(NG)",     "油當量值": 0.5925, "單位": "kLOE/立方公尺"},
-            {"能源種類": "外購電力",        "油當量值": 0.0860, "單位": "kLOE/千度"},
-            {"能源種類": "燃料煤",         "油當量值": 0.5890, "單位": "kLOE/公噸"},
-        ])
-        centered_table(df_oe)
-
-    # ── Tab 4：溫室氣體排放數據
-    with tab4:
-        st.markdown("#### 溫室氣體排放數據（類別1＋類別2）")
-
-        # 摘要卡片
-        g1, g2, g3, g4 = st.columns(4)
-        g1.metric("汽油排放",   "2.4650 公噸CO₂e", "類別1－移動源")
-        g2.metric("柴油排放",   "6.2700 公噸CO₂e", "類別1－移動源")
-        g3.metric("外購電力排放", "906.1178 公噸CO₂e", "類別2")
-        g4.metric("總排放量",   "909.11 公噸CO₂e", "合計")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 排放明細")
-        df_ghg = pd.DataFrame([
-            {
-                "項次": 1, "設備名稱": "資車・公務車", "類別": "類別1",
-                "子類別": "1.2移動燃燒直接排放", "原燃料": "汽油",
-                "活動數量": 1.0681, "活動數量單位": "公秉",
-                "CO₂排放量(公噸/年)": 2.3580, "GWP": 1.0,
-                "排放量(公噸CO₂e/年)": 2.3580
-            },
-            {
-                "項次": 2, "設備名稱": "資車", "類別": "類別1",
-                "子類別": "1.2移動燃燒直接排放", "原燃料": "柴油",
-                "活動數量": 2.0023, "活動數量單位": "公秉",
-                "CO₂排放量(公噸/年)": 3.0478, "GWP": 1.0,
-                "排放量(公噸CO₂e/年)": 3.0478
-            },
-            {
-                "項次": 3, "設備名稱": "堆高機", "類別": "類別1",
-                "子類別": "1.2移動燃燒直接排放", "原燃料": "柴油",
-                "活動數量": 2.0023, "活動數量單位": "公秉",
-                "CO₂排放量(公噸/年)": 3.1244, "GWP": 1.0,
-                "排放量(公噸CO₂e/年)": 3.1244
-            },
-            {
-                "項次": 4, "設備名稱": "未量測設定", "類別": "類別2",
-                "子類別": "2.1輸入電力的間接排放", "原燃料": "外購電力",
-                "活動數量": 1911.6410, "活動數量單位": "千度",
-                "CO₂排放量(公噸/年)": 906.1178, "GWP": 1.0,
-                "排放量(公噸CO₂e/年)": 906.1178
-            },
-        ])
-        centered_table(df_ghg)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # 排放量圓餅圖
-        fig_ghg = go.Figure(go.Pie(
-            labels=["汽油（公務車）", "柴油（資車）", "柴油（堆高機）", "外購電力"],
-            values=[2.4650, 3.0478, 3.1244, 906.1178],
-            hole=0.40,
-            marker_colors=["#3b82f6", "#f59e0b", "#ef4444", "#22c55e"],
-            textinfo="percent",
-            textposition="inside",
-            insidetextorientation="radial",
-            hovertemplate="<b>%{label}</b><br>%{value:.4f} 公噸CO₂e<br>%{percent}<extra></extra>",
-        ))
-        fig_ghg.update_layout(
-            legend=dict(
-                orientation="h",
-                yanchor="top", y=-0.05,
-                xanchor="center", x=0.5,
-                font=dict(size=12)
-            ),
-            margin=dict(t=20, b=60, l=20, r=20),
-            height=400,
-        )
-        st.plotly_chart(fig_ghg, use_container_width=True)
-        st.markdown("<p style='text-align:center;font-size:16px;font-weight:700;color:#1a3a5c;'>溫室氣體排放來源分布</p>", unsafe_allow_html=True)
-
-        st.info("""
-**排放係數來源：**
-- 溫室氣體排放係數管理表6.0.4版
-- 國家溫室氣體排放係數：汽油(移動) / 柴油(固定)
-- 來源：(5)國家排放係數
-        """)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 頁面三：每日負載分析
@@ -1114,7 +832,7 @@ elif "負載" in menu:
               f"比值 {round(pk['最高用電(kW)']/of['最低用電(kW)'],2):.2f}x")
 
     st.divider()
-    centered_table(df_load)
+    st.dataframe(df_load, hide_index=True, use_container_width=True)
     st.download_button(
         "⬇️ 下載負載曲線 CSV",
         df_load.to_csv(index=False).encode("utf-8-sig"),
