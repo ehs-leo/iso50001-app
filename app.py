@@ -363,22 +363,6 @@ with st.sidebar:
 
     st.divider()
 
-    # ── 介面設定（僅管理員可見）
-    if st.session_state["logged_in"]:
-        st.markdown("**🎨 介面設定**")
-        font_size = st.slider("表格字體大小", 10, 20,
-                              st.session_state["font_size"], 1,
-                              key="font_slider")
-        st.session_state["font_size"] = font_size
-
-        align = st.radio("表格文字對齊",
-                         ["置中", "靠左"],
-                         index=0 if st.session_state["table_align"]=="center" else 1,
-                         horizontal=True,
-                         key="align_radio")
-        st.session_state["table_align"] = "center" if align=="置中" else "left"
-        st.divider()
-
     st.markdown("**📋 功能選單**")
     base_menu = [
         "全廠能耗儀表板",
