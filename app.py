@@ -467,14 +467,28 @@ def _render_equipment_detail(r, db_idx, loop_idx):
                                 st.rerun()
                         if st.session_state[rot_key1] != 0:
                             if st.button("💾 儲存旋轉", key=f"sav1_{loop_idx}_{db_idx}", use_container_width=True):
-                                buf = BytesIO()
-                                img1.save(buf, format="JPEG", quality=92)
                                 if db_idx is not None:
-                                    st.session_state["db"][db_idx]["外觀照片"] = base64.b64encode(buf.getvalue()).decode()
-                                    save_json(st.session_state["db"])
-                                    st.session_state[rot_key1] = 0
-                                    st.success("✅ 已儲存！")
-                                    st.rerun()
+                                    try:
+                                        buf = BytesIO()
+                                        # 重新從原始資料讀取並旋轉，避免多次旋轉累積誤差
+                                        img_orig = Image.open(BytesIO(base64.b64decode(
+                                            st.session_state["db"][db_idx]["外觀照片"])))
+                                        img_rotated = img_orig.rotate(
+                                            -st.session_state[rot_key1], expand=True)
+                                        # 保持原始格式或轉為PNG避免JPEG不支援某些模式
+                                        fmt = "PNG" if img_rotated.mode in ("RGBA","P") else "JPEG"
+                                        save_kwargs = {"format": fmt}
+                                        if fmt == "JPEG":
+                                            img_rotated = img_rotated.convert("RGB")
+                                            save_kwargs["quality"] = 92
+                                        img_rotated.save(buf, **save_kwargs)
+                                        st.session_state["db"][db_idx]["外觀照片"] = base64.b64encode(buf.getvalue()).decode()
+                                        save_json(st.session_state["db"])
+                                        st.session_state[rot_key1] = 0
+                                        st.success("✅ 外觀照片已儲存！")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"儲存失敗：{e}")
                 except: st.warning("照片解碼失敗")
             else:
                 st.markdown("""
@@ -505,14 +519,26 @@ def _render_equipment_detail(r, db_idx, loop_idx):
                                 st.rerun()
                         if st.session_state[rot_key2] != 0:
                             if st.button("💾 儲存旋轉", key=f"sav2_{loop_idx}_{db_idx}", use_container_width=True):
-                                buf = BytesIO()
-                                img2.save(buf, format="JPEG", quality=92)
                                 if db_idx is not None:
-                                    st.session_state["db"][db_idx]["銘牌照片"] = base64.b64encode(buf.getvalue()).decode()
-                                    save_json(st.session_state["db"])
-                                    st.session_state[rot_key2] = 0
-                                    st.success("✅ 已儲存！")
-                                    st.rerun()
+                                    try:
+                                        buf = BytesIO()
+                                        img_orig2 = Image.open(BytesIO(base64.b64decode(
+                                            st.session_state["db"][db_idx]["銘牌照片"])))
+                                        img_rotated2 = img_orig2.rotate(
+                                            -st.session_state[rot_key2], expand=True)
+                                        fmt2 = "PNG" if img_rotated2.mode in ("RGBA","P") else "JPEG"
+                                        save_kwargs2 = {"format": fmt2}
+                                        if fmt2 == "JPEG":
+                                            img_rotated2 = img_rotated2.convert("RGB")
+                                            save_kwargs2["quality"] = 92
+                                        img_rotated2.save(buf, **save_kwargs2)
+                                        st.session_state["db"][db_idx]["銘牌照片"] = base64.b64encode(buf.getvalue()).decode()
+                                        save_json(st.session_state["db"])
+                                        st.session_state[rot_key2] = 0
+                                        st.success("✅ 銘牌照片已儲存！")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"儲存失敗：{e}")
                 except: st.warning("照片解碼失敗")
             else:
                 st.markdown("""
